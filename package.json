@@ -1,0 +1,19 @@
+{
+  "name": "family-meal-planner",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local family meal planner with recipe import, a shared MongoDB-backed shopping list, and a recipe bank",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=12.20.0"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mongodb": "^4.17.2",
+    "node-fetch": "^2.7.0"
+  }
+}

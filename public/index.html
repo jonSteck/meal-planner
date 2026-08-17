@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Family Meal Planner</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
+
+* { box-sizing: border-box; }
+html, body { margin:0; padding:0; background:#F6F1E3; color-scheme: light; }
+
+:root { --ink:#2B2A28; --paper:#F6F1E3; --card:#FFFDF7; --sage:#5F7A55; --sage-dark:#425A3A; --butter:#DFAE33; --rust:#B24C32; --line:#DCD4BC; }
+
+.fmp-root {
+  background:var(--paper); color:var(--ink); font-family:'Karla',sans-serif; min-height:100vh; padding:28px 18px 60px; color-scheme: light; }
+.fmp-root select, .fmp-root input, .fmp-root textarea, .fmp-root button { color-scheme: light; }
+.fmp-wrap { max-width:1180px; margin:0 auto; }
+
+.fmp-header { display:flex; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:14px; margin-bottom:18px; }
+.fmp-title { font-family:'Fraunces',serif; font-weight:600; font-size:34px; letter-spacing:-0.01em; margin:0; }
+.fmp-title em { font-style:italic; color:var(--sage-dark); }
+.fmp-subtitle { font-size:14px; color:#6b6558; margin-top:4px; }
+
+.fmp-weeknav { display:flex; align-items:center; gap:10px; background:var(--card); border:1px solid var(--line); border-radius:999px; padding:6px 8px 6px 14px; }
+.fmp-weeknav button { background:none; border:none; cursor:pointer; color:var(--ink); font-size:16px; padding:6px 10px; border-radius:999px; }
+.fmp-weeknav button:hover { background:var(--paper); }
+.fmp-weeknav span { font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:600; min-width:150px; text-align:center; display:inline-block; }
+
+.fmp-notes-row { display:flex; gap:10px; align-items:center; margin-bottom:6px; flex-wrap:wrap; }
+.fmp-notes-row input { flex:1; min-width:220px; font-family:'Karla',sans-serif; font-size:13px; border:1px solid var(--line); border-radius:9px; padding:10px 12px; background:var(--card); color:var(--ink); }
+.fmp-btn-primary { display:inline-flex; align-items:center; gap:6px; background:var(--sage); border:none; color:#fff; font-family:'Karla',sans-serif; font-weight:600; font-size:13px; padding:9px 16px; border-radius:999px; cursor:pointer; white-space:nowrap; }
+.fmp-btn-primary:hover:not(:disabled) { background:var(--sage-dark); }
+.fmp-btn-primary:disabled { opacity:0.55; cursor:default; }
+.fmp-btn-ghost { display:inline-flex; align-items:center; gap:6px; background:transparent; border:1px solid var(--line); color:var(--sage-dark); font-family:'Karla',sans-serif; font-weight:600; font-size:13px; padding:9px 14px; border-radius:999px; cursor:pointer; white-space:nowrap; }
+.fmp-btn-ghost:hover { border-color:var(--sage); background:var(--card); }
+
+.fmp-recipebank { background:#FFFDF7; border:1px solid var(--line); border-radius:14px; padding:16px 18px 18px; margin:14px 0 18px; }
+.fmp-recipebank-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+.fmp-recipebank-title { font-family:'Fraunces',serif; font-weight:600; font-size:17px; }
+.fmp-link-form { display:flex; gap:8px; margin-bottom:8px; }
+.fmp-link-form input { flex:1; font-family:'Karla',sans-serif; font-size:13px; border:1px solid var(--line); border-radius:8px; padding:9px 11px; background:#fff; color:var(--ink); }
+.fmp-link-preview { border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin:10px 0 14px; background:#FFFFFF; }
+.fmp-link-preview-actions { display:flex; gap:8px; margin-top:10px; }
+.fmp-manual-toggle { font-size:12.5px; color:var(--sage-dark); cursor:pointer; text-decoration:underline; margin-bottom:10px; display:inline-block; }
+.fmp-manual-form { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; background:#FFFFFF; border:1px solid var(--line); border-radius:10px; padding:14px; }
+.fmp-manual-form input, .fmp-manual-form textarea { width:100%; font-family:'Karla',sans-serif; font-size:13px; border:1px solid var(--line); border-radius:8px; padding:8px 10px; background:#fff; color:var(--ink); }
+.fmp-manual-form textarea { min-height:56px; resize:vertical; }
+.fmp-recipe-list { display:flex; flex-direction:column; gap:6px; max-height:320px; overflow-y:auto; border-top:1px dashed var(--line); padding-top:10px; }
+.fmp-recipe-row { display:flex; align-items:center; justify-content:space-between; padding:9px 12px; gap:10px; background:#FFFFFF; border:1px solid var(--line); border-radius:9px; }
+.fmp-recipe-row-info { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.fmp-recipe-row-name { font-size:13.5px; font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.fmp-recipe-row-meta { font-size:10.5px; color:#8b8474; font-family:'IBM Plex Mono',monospace; }
+.fmp-recipe-row-actions { display:flex; gap:4px; flex:none; }
+
+.fmp-grid { display:grid; grid-template-columns:1fr; gap:26px; }
+@media (min-width:920px) { .fmp-grid { grid-template-columns: 2.15fr 1fr; align-items:start; } }
+
+.fmp-days { display:grid; grid-template-columns:1fr; gap:12px; }
+@media (min-width:620px) { .fmp-days { grid-template-columns:1fr 1fr; } }
+
+.fmp-day { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 16px 16px; position:relative; transition:box-shadow .15s ease; }
+.fmp-day:hover { box-shadow:0 6px 18px rgba(43,42,40,0.06); }
+.fmp-day-head { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px; }
+.fmp-day-name { font-family:'Fraunces',serif; font-weight:600; font-size:17px; }
+.fmp-day-date { font-family:'IBM Plex Mono',monospace; font-size:11px; color:#8b8474; }
+
+.fmp-select { width:100%; font-family:'Karla',sans-serif; font-size:13.5px; padding:9px 10px; border-radius:9px; border:1px solid var(--line); background:#fff; color:var(--ink); cursor:pointer; }
+
+.fmp-meal-card { margin-top:10px; }
+.fmp-meal-name { font-weight:600; font-size:14.5px; line-height:1.3; }
+.fmp-meal-meta { display:flex; gap:6px; flex-wrap:wrap; margin:7px 0 8px; }
+.fmp-tag { font-size:10.5px; font-family:'IBM Plex Mono',monospace; letter-spacing:.02em; padding:2px 8px; border-radius:999px; background:rgba(95,122,85,0.12); color:var(--sage-dark); display:inline-flex; align-items:center; gap:3px; }
+.fmp-tag.time { background:rgba(223,174,51,0.18); color:#8a6a10; }
+.fmp-ingr-list { font-size:12px; color:#6b6558; line-height:1.6; }
+.fmp-day-actions { display:flex; justify-content:flex-end; gap:6px; margin-top:8px; flex-wrap:wrap; }
+.fmp-icon-btn { background:none; border:none; color:#a39c8a; cursor:pointer; padding:4px; font-size:14px; }
+.fmp-icon-btn:hover:not(:disabled) { color:var(--rust); }
+.fmp-icon-btn:disabled { opacity:0.5; cursor:default; }
+
+.fmp-custom textarea, .fmp-custom input { width:100%; font-family:'Karla',sans-serif; font-size:13px; border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin-top:8px; background:#fff; color:var(--ink); }
+.fmp-custom textarea { min-height:64px; resize:vertical; font-family:'IBM Plex Mono',monospace; font-size:12px; }
+.fmp-custom label { font-size:11px; color:#8b8474; text-transform:uppercase; letter-spacing:.04em; margin-top:8px; display:block; }
+
+.fmp-form-error { font-size:11.5px; color:var(--rust); margin-top:6px; }
+.fmp-spin { display:inline-block; animation: fmp-spin 0.8s linear infinite; }
+@keyframes fmp-spin { to { transform: rotate(360deg); } }
+
+.fmp-receipt { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:0; position:sticky; top:18px; overflow:hidden; }
+.fmp-receipt-top { background:repeating-linear-gradient(90deg, transparent 0 8px, var(--paper) 8px 16px); height:10px; }
+.fmp-receipt-head { padding:16px 20px 12px; border-bottom:1px dashed var(--line); display:flex; align-items:center; justify-content:space-between; }
+.fmp-receipt-title { font-family:'Fraunces',serif; font-weight:600; font-size:19px; display:flex; align-items:center; gap:8px; }
+.fmp-receipt-count { font-family:'IBM Plex Mono',monospace; font-size:11px; color:#8b8474; }
+.fmp-receipt-body { padding:6px 20px 4px; max-height:560px; overflow-y:auto; }
+.fmp-section-label { font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--sage-dark); margin:16px 0 6px; }
+.fmp-item-row { display:flex; align-items:baseline; gap:8px; padding:5px 0; cursor:pointer; }
+.fmp-checkbox { width:15px; height:15px; border-radius:4px; border:1.5px solid #b8b1a0; flex:none; display:flex; align-items:center; justify-content:center; margin-top:2px; font-size:10px; color:#fff; }
+.fmp-checkbox.on { background:var(--sage); border-color:var(--sage); }
+.fmp-item-name { font-size:13.5px; flex:none; }
+.fmp-item-leader { flex:1; border-bottom:1px dotted #c9c1ac; margin:0 2px; transform:translateY(-3px); }
+.fmp-item-qty { font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:#6b6558; flex:none; white-space:nowrap; }
+.fmp-item-row.done .fmp-item-name { text-decoration:line-through; color:#a39c8a; }
+.fmp-item-row.done .fmp-item-qty { color:#c9c1ac; }
+.fmp-item-src { font-size:10px; color:#a39c8a; margin-left:6px; }
+
+.fmp-empty { padding:22px 20px 26px; color:#8b8474; font-size:13.5px; line-height:1.6; }
+
+.fmp-extra { border-top:1px dashed var(--line); padding:14px 20px 16px; }
+.fmp-extra-form { display:flex; gap:6px; margin-top:6px; }
+.fmp-extra-form input { flex:1; font-family:'Karla',sans-serif; font-size:13px; border:1px solid var(--line); border-radius:8px; padding:8px 10px; background:#fff; color:var(--ink); }
+.fmp-extra-form button { background:var(--sage); border:none; color:#fff; border-radius:8px; padding:0 14px; cursor:pointer; font-size:15px; }
+.fmp-extra-list { margin-top:8px; display:flex; flex-direction:column; gap:4px; }
+.fmp-extra-item { display:flex; align-items:center; justify-content:space-between; font-size:12.5px; color:#6b6558; }
+.fmp-extra-item button { background:none; border:none; color:#c9c1ac; cursor:pointer; font-size:13px; }
+.fmp-extra-item button:hover { color:var(--rust); }
+
+.fmp-receipt-actions { display:flex; gap:8px; padding:12px 20px 18px; border-top:1px dashed var(--line); }
+.fmp-receipt-actions button { flex:1; font-family:'Karla',sans-serif; font-weight:600; font-size:12.5px; padding:9px 8px; border-radius:8px; border:1px solid var(--line); background:#fff; color:var(--ink); cursor:pointer; }
+.fmp-receipt-actions button:hover { border-color:var(--sage); color:var(--sage-dark); }
+
+.fmp-copied { font-size:11px; color:var(--sage-dark); text-align:center; padding:0 20px 10px; display:none; }
+
+#modal-root { font-family:'Karla',sans-serif; color:var(--ink); color-scheme: light; }
+.fmp-savenote { font-size:11.5px; color:#a39c8a; text-align:center; margin-top:18px; }
+.fmp-db-banner { background:#FCEEE9; border:1px solid #E8B7A5; color:#8a3d20; font-size:13px; font-weight:600; padding:10px 16px; border-radius:10px; margin-bottom:16px; }
+
+.fmp-modal-backdrop { position:fixed; inset:0; background:rgba(43,42,40,0.45); display:flex; align-items:center; justify-content:center; padding:24px; z-index:50; }
+.fmp-modal { background:var(--card); border-radius:18px; max-width:640px; width:100%; max-height:85vh; overflow-y:auto; padding:28px 30px 30px; position:relative; }
+.fmp-modal-close { position:absolute; top:18px; right:18px; background:none; border:none; color:#a39c8a; cursor:pointer; font-size:18px; }
+.fmp-modal-close:hover { color:var(--rust); }
+.fmp-modal-title { font-family:'Fraunces',serif; font-weight:700; font-size:26px; margin:0 8px 6px 0; padding-right:26px; }
+.fmp-modal-meta { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:20px; }
+.fmp-modal-section-title { font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--sage-dark); margin:20px 0 10px; }
+.fmp-modal-ingredients { display:flex; flex-direction:column; gap:7px; }
+.fmp-modal-ingredient { font-size:14px; display:flex; gap:10px; }
+.fmp-modal-ingredient .qty { font-family:'IBM Plex Mono',monospace; color:#6b6558; min-width:70px; flex:none; }
+.fmp-modal-steps { display:flex; flex-direction:column; gap:14px; }
+.fmp-modal-step { display:flex; gap:14px; font-size:14.5px; line-height:1.55; }
+.fmp-modal-step-num { font-family:'Fraunces',serif; font-weight:700; color:var(--sage); font-size:17px; flex:none; width:22px; }
+.fmp-modal-source { margin-top:22px; font-size:12.5px; }
+.fmp-modal-source a { color:var(--sage-dark); }
+.fmp-modal-empty-steps { font-size:13px; color:#8b8474; font-style:italic; }
+</style>
+</head>
+<body>
+<div id="app" class="fmp-root"></div>
+<div id="modal-root"></div>
+
+<script>
+/* ---------------------------------- data ---------------------------------- */
+const DAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const DAY_FULL = { Mon:"Monday", Tue:"Tuesday", Wed:"Wednesday", Thu:"Thursday", Fri:"Friday", Sat:"Saturday", Sun:"Sunday" };
+const SECTIONS = ["Produce","Meat & Seafood","Dairy & Eggs","Pantry","Frozen","Bakery","Other"];
+const TAG_LABEL = { quick:"quick", "kid-friendly":"kid favorite", slow:"slow cooker", veg:"vegetarian", "freezer-friendly":"freezes well", healthy:"light", comfort:"comfort food", fun:"hands-on" };
+const UNIT_WORDS = ["lb","lbs","oz","g","kg","cup","cups","tbsp","tsp","clove","cloves","can","cans","bunch","bunches","head","heads","pint","pints","qt","quart","gallon","dozen","slice","slices","stick","sticks","jar","jars","bag","bags","box","boxes","package","packages","pkg","stalk","stalks","block","blocks"];
+
+const SEED_RECIPES = [
+  { id:"m1", name:"Sheet-Pan Lemon Chicken & Broccoli", tags:["quick","kid-friendly"], time:"30 min", sourceUrl:null, ingredients:[
+    {name:"chicken thighs",qty:2,unit:"lb",section:"Meat & Seafood"},{name:"broccoli",qty:1,unit:"head",section:"Produce"},
+    {name:"lemon",qty:2,unit:"",section:"Produce"},{name:"garlic",qty:3,unit:"clove",section:"Produce"},{name:"olive oil",qty:2,unit:"tbsp",section:"Pantry"}],
+    instructions:["Preheat oven to 425\u00B0F.","Toss chicken thighs and broccoli with olive oil, garlic, salt and pepper on a sheet pan.","Nestle lemon halves among the chicken.","Roast 25\u201330 min, until chicken reaches 165\u00B0F.","Squeeze the roasted lemon over everything before serving."] },
+  { id:"m2", name:"Turkey Taco Night", tags:["quick","kid-friendly"], time:"25 min", sourceUrl:null, ingredients:[
+    {name:"ground turkey",qty:1.5,unit:"lb",section:"Meat & Seafood"},{name:"taco shells",qty:1,unit:"box",section:"Pantry"},
+    {name:"shredded cheese",qty:8,unit:"oz",section:"Dairy & Eggs"},{name:"salsa",qty:1,unit:"jar",section:"Pantry"},
+    {name:"lettuce",qty:1,unit:"head",section:"Produce"},{name:"tomato",qty:2,unit:"",section:"Produce"}],
+    instructions:["Brown ground turkey in a skillet with taco seasoning, about 8 min.","Warm taco shells per package instructions.","Shred lettuce and dice tomato.","Set out turkey, shells, and toppings buffet-style for everyone to build their own."] },
+  { id:"m3", name:"Slow Cooker Beef Chili", tags:["slow","freezer-friendly"], time:"6 hr (slow cooker)", sourceUrl:null, ingredients:[
+    {name:"ground beef",qty:2,unit:"lb",section:"Meat & Seafood"},{name:"kidney beans",qty:2,unit:"can",section:"Pantry"},
+    {name:"diced tomatoes",qty:1,unit:"can",section:"Pantry"},{name:"onion",qty:1,unit:"",section:"Produce"},
+    {name:"bell pepper",qty:1,unit:"",section:"Produce"},{name:"chili powder",qty:2,unit:"tbsp",section:"Pantry"}],
+    instructions:["Brown the beef and drain excess fat.","Add beef, beans, tomatoes, diced onion, pepper, and chili powder to the slow cooker.","Stir, cover, and cook on low 6 hours.","Taste and adjust seasoning before serving."] },
+  { id:"m4", name:"Salmon with Roasted Asparagus", tags:["quick","healthy"], time:"25 min", sourceUrl:null, ingredients:[
+    {name:"salmon fillets",qty:4,unit:"",section:"Meat & Seafood"},{name:"asparagus",qty:1,unit:"bunch",section:"Produce"},
+    {name:"lemon",qty:1,unit:"",section:"Produce"},{name:"garlic",qty:2,unit:"clove",section:"Produce"},{name:"olive oil",qty:2,unit:"tbsp",section:"Pantry"}],
+    instructions:["Preheat oven to 400\u00B0F.","Trim asparagus and toss with half the oil, salt, and pepper on a sheet pan.","Push asparagus aside, place salmon on the pan, drizzle with remaining oil, garlic and lemon slices.","Roast 12\u201315 min until salmon flakes easily."] },
+  { id:"m5", name:"One-Pot Chicken & Rice", tags:["quick","kid-friendly"], time:"35 min", sourceUrl:null, ingredients:[
+    {name:"chicken breast",qty:1.5,unit:"lb",section:"Meat & Seafood"},{name:"rice",qty:1.5,unit:"cup",section:"Pantry"},
+    {name:"chicken broth",qty:3,unit:"cup",section:"Pantry"},{name:"carrot",qty:2,unit:"",section:"Produce"},
+    {name:"onion",qty:1,unit:"",section:"Produce"},{name:"peas",qty:1,unit:"cup",section:"Frozen"}],
+    instructions:["Sear diced chicken in a large pot, then remove.","Saut\u00E9 onion and carrot until soft.","Add rice, broth, and chicken back in; bring to a boil.","Cover, reduce heat, simmer 18 min.","Stir in peas and rest 5 min before serving."] },
+  { id:"m6", name:"Veggie Stir-Fry with Tofu", tags:["quick","veg"], time:"20 min", sourceUrl:null, ingredients:[
+    {name:"tofu",qty:1,unit:"block",section:"Other"},{name:"bell pepper",qty:2,unit:"",section:"Produce"},
+    {name:"broccoli",qty:1,unit:"head",section:"Produce"},{name:"garlic",qty:2,unit:"clove",section:"Produce"},
+    {name:"ginger",qty:1,unit:"tbsp",section:"Produce"},{name:"soy sauce",qty:3,unit:"tbsp",section:"Pantry"},{name:"rice",qty:1,unit:"cup",section:"Pantry"}],
+    instructions:["Press and cube the tofu, then pan-fry until golden; set aside.","Stir-fry garlic and ginger 30 sec, then add broccoli and pepper.","Cook 4\u20135 min until crisp-tender.","Return tofu to the pan, add soy sauce, toss to coat.","Serve over cooked rice."] },
+  { id:"m7", name:"Spaghetti with Turkey Meatballs", tags:["kid-friendly","freezer-friendly"], time:"40 min", sourceUrl:null, ingredients:[
+    {name:"ground turkey",qty:1,unit:"lb",section:"Meat & Seafood"},{name:"spaghetti",qty:1,unit:"lb",section:"Pantry"},
+    {name:"marinara sauce",qty:1,unit:"jar",section:"Pantry"},{name:"parmesan",qty:4,unit:"oz",section:"Dairy & Eggs"},
+    {name:"egg",qty:1,unit:"",section:"Dairy & Eggs"},{name:"breadcrumbs",qty:0.5,unit:"cup",section:"Pantry"}],
+    instructions:["Mix turkey, egg, breadcrumbs, and parmesan; form into meatballs.","Bake at 400\u00B0F for 18 min, or brown in a skillet.","Simmer meatballs in marinara sauce 10 min.","Cook spaghetti to package directions and serve topped with meatballs and sauce."] },
+  { id:"m8", name:"Sheet-Pan Sausage & Peppers", tags:["quick"], time:"30 min", sourceUrl:null, ingredients:[
+    {name:"sausage",qty:1,unit:"lb",section:"Meat & Seafood"},{name:"bell pepper",qty:3,unit:"",section:"Produce"},
+    {name:"onion",qty:1,unit:"",section:"Produce"},{name:"olive oil",qty:2,unit:"tbsp",section:"Pantry"}],
+    instructions:["Preheat oven to 425\u00B0F.","Slice sausage, peppers, and onion.","Toss with oil, salt, and pepper on a sheet pan.","Roast 25 min, stirring once, until sausage is cooked through."] },
+  { id:"m9", name:"Black Bean & Sweet Potato Enchiladas", tags:["veg","freezer-friendly"], time:"45 min", sourceUrl:null, ingredients:[
+    {name:"sweet potato",qty:2,unit:"",section:"Produce"},{name:"black beans",qty:2,unit:"can",section:"Pantry"},
+    {name:"tortillas",qty:8,unit:"",section:"Bakery"},{name:"enchilada sauce",qty:1,unit:"can",section:"Pantry"},
+    {name:"shredded cheese",qty:8,unit:"oz",section:"Dairy & Eggs"},{name:"onion",qty:1,unit:"",section:"Produce"}],
+    instructions:["Roast diced sweet potato at 400\u00B0F for 20 min until tender.","Mix sweet potato, beans, diced onion, and a splash of enchilada sauce.","Fill tortillas, roll, and place seam-down in a baking dish.","Cover with remaining sauce and cheese.","Bake at 375\u00B0F for 20 min until bubbly."] },
+  { id:"m10", name:"Grilled Cheese & Tomato Soup", tags:["quick","kid-friendly","comfort"], time:"15 min", sourceUrl:null, ingredients:[
+    {name:"bread",qty:8,unit:"slice",section:"Bakery"},{name:"cheddar cheese",qty:8,unit:"slice",section:"Dairy & Eggs"},
+    {name:"butter",qty:2,unit:"tbsp",section:"Dairy & Eggs"},{name:"tomato soup",qty:2,unit:"can",section:"Pantry"}],
+    instructions:["Butter bread and assemble sandwiches with cheese.","Grill in a skillet 3\u20134 min per side until golden and melty.","Heat tomato soup on the stove while sandwiches cook.","Serve soup alongside sandwiches for dipping."] },
+  { id:"m11", name:"Baked Ziti", tags:["kid-friendly","freezer-friendly"], time:"45 min", sourceUrl:null, ingredients:[
+    {name:"ziti pasta",qty:1,unit:"lb",section:"Pantry"},{name:"ricotta cheese",qty:15,unit:"oz",section:"Dairy & Eggs"},
+    {name:"marinara sauce",qty:1,unit:"jar",section:"Pantry"},{name:"mozzarella",qty:8,unit:"oz",section:"Dairy & Eggs"},{name:"egg",qty:1,unit:"",section:"Dairy & Eggs"}],
+    instructions:["Cook ziti to al dente and drain.","Mix ricotta with the egg.","Combine pasta, ricotta mixture, and half the marinara in a baking dish.","Top with remaining sauce and mozzarella.","Bake at 375\u00B0F for 25 min until bubbly."] },
+  { id:"m12", name:"Shrimp Fried Rice", tags:["quick"], time:"20 min", sourceUrl:null, ingredients:[
+    {name:"shrimp",qty:1,unit:"lb",section:"Meat & Seafood"},{name:"rice",qty:3,unit:"cup",section:"Pantry"},
+    {name:"egg",qty:2,unit:"",section:"Dairy & Eggs"},{name:"peas",qty:1,unit:"cup",section:"Frozen"},
+    {name:"scallion",qty:3,unit:"",section:"Produce"},{name:"soy sauce",qty:3,unit:"tbsp",section:"Pantry"}],
+    instructions:["Saut\u00E9 shrimp until pink; set aside.","Scramble eggs in the same pan; set aside.","Add cold cooked rice and peas, stir-frying 3\u20134 min.","Return shrimp and egg to the pan, add soy sauce and scallions, toss and serve."] },
+  { id:"m13", name:"Slow Cooker Pulled Pork", tags:["slow","freezer-friendly"], time:"8 hr (slow cooker)", sourceUrl:null, ingredients:[
+    {name:"pork shoulder",qty:3,unit:"lb",section:"Meat & Seafood"},{name:"bbq sauce",qty:1,unit:"cup",section:"Pantry"},
+    {name:"onion",qty:1,unit:"",section:"Produce"},{name:"buns",qty:8,unit:"",section:"Bakery"},{name:"coleslaw mix",qty:1,unit:"bag",section:"Produce"}],
+    instructions:["Place pork and sliced onion in the slow cooker with half the BBQ sauce.","Cook on low 8 hours until falling apart.","Shred pork and mix with remaining sauce.","Pile onto buns and top with coleslaw."] },
+  { id:"m14", name:"Chicken Fajita Bowls", tags:["quick"], time:"30 min", sourceUrl:null, ingredients:[
+    {name:"chicken breast",qty:1.5,unit:"lb",section:"Meat & Seafood"},{name:"bell pepper",qty:3,unit:"",section:"Produce"},
+    {name:"onion",qty:1,unit:"",section:"Produce"},{name:"rice",qty:1.5,unit:"cup",section:"Pantry"},
+    {name:"lime",qty:2,unit:"",section:"Produce"},{name:"sour cream",qty:0.5,unit:"cup",section:"Dairy & Eggs"}],
+    instructions:["Slice chicken, peppers, and onion.","Sear chicken in a hot skillet with fajita seasoning, then remove.","Saut\u00E9 peppers and onion until charred at the edges.","Return chicken to the pan; squeeze lime over top.","Serve over rice with sour cream."] },
+  { id:"m15", name:"Lentil Soup", tags:["veg","freezer-friendly"], time:"40 min", sourceUrl:null, ingredients:[
+    {name:"lentils",qty:1.5,unit:"cup",section:"Pantry"},{name:"carrot",qty:3,unit:"",section:"Produce"},
+    {name:"celery",qty:3,unit:"stalk",section:"Produce"},{name:"onion",qty:1,unit:"",section:"Produce"},
+    {name:"garlic",qty:3,unit:"clove",section:"Produce"},{name:"vegetable broth",qty:4,unit:"cup",section:"Pantry"}],
+    instructions:["Saut\u00E9 diced onion, carrot, and celery until soft.","Add garlic and cook 1 min.","Add lentils and broth; bring to a boil.","Reduce heat and simmer 25\u201330 min until lentils are tender.","Blend part of the soup for a creamier texture if desired."] },
+  { id:"m16", name:"Homemade Pizza Night", tags:["kid-friendly","fun"], time:"30 min", sourceUrl:null, ingredients:[
+    {name:"pizza dough",qty:1,unit:"lb",section:"Bakery"},{name:"mozzarella",qty:8,unit:"oz",section:"Dairy & Eggs"},
+    {name:"marinara sauce",qty:1,unit:"cup",section:"Pantry"},{name:"toppings of choice",qty:1,unit:"",section:"Other"}],
+    instructions:["Preheat oven to 475\u00B0F with a pan or stone inside.","Stretch dough into a round.","Top with sauce, cheese, and toppings.","Bake 10\u201312 min until crust is golden and cheese bubbles.","Let kids build their own for extra fun."] },
+  { id:"m17", name:"Pork Chops with Apples & Sweet Potato", tags:["quick","comfort"], time:"35 min", sourceUrl:null, ingredients:[
+    {name:"pork chops",qty:4,unit:"",section:"Meat & Seafood"},{name:"apple",qty:2,unit:"",section:"Produce"},
+    {name:"sweet potato",qty:2,unit:"",section:"Produce"},{name:"olive oil",qty:2,unit:"tbsp",section:"Pantry"},{name:"cinnamon",qty:1,unit:"tsp",section:"Pantry"}],
+    instructions:["Sear pork chops in oil, 3\u20134 min per side; set aside.","In the same pan, saut\u00E9 sliced apples and cubed sweet potato with cinnamon until tender.","Return chops to the pan to finish cooking through, about 5 more min."] },
+  { id:"m18", name:"Veggie Frittata (Breakfast for Dinner)", tags:["quick","kid-friendly"], time:"20 min", sourceUrl:null, ingredients:[
+    {name:"egg",qty:8,unit:"",section:"Dairy & Eggs"},{name:"spinach",qty:2,unit:"cup",section:"Produce"},
+    {name:"cheddar cheese",qty:4,unit:"oz",section:"Dairy & Eggs"},{name:"bell pepper",qty:1,unit:"",section:"Produce"},{name:"milk",qty:0.25,unit:"cup",section:"Dairy & Eggs"}],
+    instructions:["Preheat oven to 375\u00B0F.","Whisk eggs with milk, salt, and pepper.","Saut\u00E9 spinach and diced pepper in an oven-safe skillet until wilted.","Pour egg mixture over vegetables, sprinkle with cheese.","Bake 15 min until set."] },
+];
+
+/* -------------------------------- helpers -------------------------------- */
+function getMonday(d){ const date=new Date(d); const day=date.getDay(); const diff=date.getDate()-day+(day===0?-6:1); const monday=new Date(date.setDate(diff)); monday.setHours(0,0,0,0); return monday; }
+function addDays(date,n){ const d=new Date(date); d.setDate(d.getDate()+n); return d; }
+function isoDate(d){ return d.toISOString().slice(0,10); }
+function formatWeekRange(monday){ const sunday=addDays(monday,6); const optsA={month:"short",day:"numeric"}; const optsB= monday.getFullYear()===sunday.getFullYear()? optsA : {month:"short",day:"numeric",year:"numeric"}; return monday.toLocaleDateString(undefined,optsA)+" \u2013 "+sunday.toLocaleDateString(undefined,optsB); }
+function formatDayDate(monday,idx){ return addDays(monday,idx).toLocaleDateString(undefined,{month:"short",day:"numeric"}); }
+
+const SECTION_KEYWORDS = {
+  "Produce":["onion","garlic","lemon","lime","tomato","pepper","broccoli","spinach","lettuce","carrot","potato","cilantro","basil","avocado","cucumber","apple","banana","mushroom","celery","zucchini","ginger","scallion","kale","asparagus"],
+  "Meat & Seafood":["chicken","beef","pork","salmon","shrimp","turkey","bacon","sausage","fish","steak"],
+  "Dairy & Eggs":["milk","cheese","yogurt","butter","egg","cream","parmesan","mozzarella","ricotta"],
+  "Frozen":["frozen","peas"],
+  "Bakery":["bread","bun","roll","bagel","tortilla","dough"],
+  "Pantry":["oil","flour","sugar","rice","pasta","bean","broth","stock","sauce","vinegar","spice","salt","cumin","paprika","noodle","can ","lentil","chili powder"],
+};
+function guessSection(name){ const n=name.toLowerCase(); for(const [section,words] of Object.entries(SECTION_KEYWORDS)){ if(words.some(w=>n.includes(w))) return section; } return "Other"; }
+
+const UNICODE_FRACTIONS = { "\u00BC":"1/4", "\u00BD":"1/2", "\u00BE":"3/4", "\u2153":"1/3", "\u2154":"2/3", "\u2155":"1/5", "\u2156":"2/5", "\u2157":"3/5", "\u2158":"4/5", "\u2159":"1/6", "\u215A":"5/6", "\u215B":"1/8", "\u215C":"3/8", "\u215D":"5/8", "\u215E":"7/8" };
+function normalizeFractions(str){
+  let s = str;
+  // Insert a space between a digit and an immediately-following fraction glyph, e.g. "1½" -> "1 ½"
+  s = s.replace(/(\d)([\u00BC\u00BD\u00BE\u2153\u2154\u2155\u2156\u2157\u2158\u2159\u215A\u215B\u215C\u215D\u215E])/g, "$1 $2");
+  Object.keys(UNICODE_FRACTIONS).forEach((ch)=>{ s = s.split(ch).join(UNICODE_FRACTIONS[ch]); });
+  return s;
+}
+
+// Reads the leading quantity off a string (mixed number, fraction, decimal, or
+// plain integer) and returns { qty, rest } — or null if the string doesn't
+// start with a number at all. This is checked BEFORE we look for a unit, so
+// a mixed number like "2 1/2" is captured as one quantity (2.5) instead of
+// letting "1/2" get mistaken for part of the unit/name.
+function parseQuantityToken(str){
+  let m = str.match(/^(\d+)\s+(\d+)\/(\d+)(?:\s+(.*))?$/); // mixed number: "2 1/2 lbs beef"
+  if(m){
+    const whole = parseFloat(m[1]), num = parseFloat(m[2]), den = parseFloat(m[3]);
+    return { qty: whole + (den ? num/den : 0), rest: (m[4]||"").trim() };
+  }
+  m = str.match(/^(\d+)\/(\d+)(?:\s+(.*))?$/); // simple fraction: "1/2 cup sugar"
+  if(m){
+    const num = parseFloat(m[1]), den = parseFloat(m[2]);
+    return { qty: den ? num/den : 0, rest: (m[3]||"").trim() };
+  }
+  m = str.match(/^(\d+\.\d+)(?:\s+(.*))?$/); // decimal: "1.5 lb beef"
+  if(m) return { qty: parseFloat(m[1]), rest: (m[2]||"").trim() };
+  m = str.match(/^(\d+)(?:\s+(.*))?$/); // plain integer: "2 onions"
+  if(m) return { qty: parseFloat(m[1]), rest: (m[2]||"").trim() };
+  return null;
+}
+function parseIngredientLine(line){
+  const trimmed = normalizeFractions(line).trim();
+  if(!trimmed) return null;
+  const qtyMatch = parseQuantityToken(trimmed);
+  if(qtyMatch && qtyMatch.rest){
+    let rest = qtyMatch.rest;
+    let unit = "";
+    const unitMatch = rest.match(/^([a-zA-Z]+)(?:\s+(.*))?$/);
+    if(unitMatch && unitMatch[2] && UNIT_WORDS.includes(unitMatch[1].toLowerCase())){
+      unit = unitMatch[1].toLowerCase();
+      rest = unitMatch[2].trim();
+    }
+    if(!rest) return null;
+    return {name:rest, qty:qtyMatch.qty, unit, section:guessSection(rest)};
+  }
+  return {name:trimmed, qty:1, unit:"", section:guessSection(trimmed)};
+}
+function buildShoppingList(weekData, bank){
+  const items={};
+  const addIngredient=(ing,sourceLabel)=>{
+    const key=(ing.name.toLowerCase())+"|"+((ing.unit||"").toLowerCase());
+    if(!items[key]) items[key]={name:ing.name, unit:ing.unit, qty:0, section:ing.section, sources:new Set()};
+    items[key].qty += ing.qty;
+    items[key].sources.add(sourceLabel);
+  };
+  DAYS.forEach(day=>{
+    const entry=weekData.days[day]; if(!entry) return;
+    if(entry.mealId){ const meal=bank.find(m=>m.id===entry.mealId); if(meal) meal.ingredients.forEach(ing=>addIngredient(ing,day)); }
+    if(entry.customIngredients){ entry.customIngredients.split("\n").map(parseIngredientLine).filter(Boolean).forEach(ing=>addIngredient(ing,day)); }
+  });
+  (weekData.extraItems||[]).forEach(text=>{ const parsed=parseIngredientLine(text); if(parsed) addIngredient(parsed,"extra"); });
+  const sections = SECTIONS.map(name=>({ name, items:Object.values(items).filter(it=>it.section===name).sort((a,b)=>a.name.localeCompare(b.name)) })).filter(s=>s.items.length>0);
+  const totalCount = Object.keys(items).length;
+  return { sections, totalCount };
+}
+function formatQty(qty){ if(Number.isInteger(qty)) return String(qty); return (Math.round(qty*100)/100).toString(); }
+function ingredientsToLines(ingredients){
+  return (ingredients||[]).map(ing=>{
+    const qtyStr = formatQty(ing.qty);
+    return ing.unit ? (qtyStr+" "+ing.unit+" "+ing.name) : (qtyStr+" "+ing.name);
+  }).join("\n");
+}
+function escapeHTML(str){ return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function escapeAttr(str){ return escapeHTML(str).replace(/"/g,"&quot;"); }
+
+let __idSeq = 0;
+function genId(){ __idSeq += 1; return "r"+Date.now().toString(36)+__idSeq.toString(36); }
+
+/* ---------------------------------- state ---------------------------------- */
+let weekOffset = 0;
+let monday = getMonday(new Date());
+let weekData = { days:{}, extraItems:[], checked:[], notes:"" };
+let debounceTimer = null;
+
+let recipeBank = [];
+let showBank = false;
+let linkUrl = "";
+let linkLoading = false;
+let linkError = null;
+let linkPreview = null;
+let showManualForm = false;
+let editingRecipeId = null;
+
+let cookingRecipe = null;
+let dbConnected = true; // corrected by the first health check, before the first render
+
+async function checkDbHealth(){
+  try{
+    const res = await fetch("/api/health");
+    const data = await res.json();
+    dbConnected = !!data.ok;
+  }catch(e){
+    dbConnected = false;
+  }
+}
+
+/* ---- Server-backed storage (shared across every device hitting this server) ---- */
+async function apiGet(key){
+  const res = await fetch("/api/data/"+encodeURIComponent(key));
+  const data = await res.json();
+  return data.value;
+}
+async function apiPut(key, value){
+  await fetch("/api/data/"+encodeURIComponent(key), {
+    method: "PUT",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ value })
+  });
+}
+
+function storageKey(){ return "mealplan:"+isoDate(monday); }
+async function loadWeek(){
+  try{
+    const data = await apiGet(storageKey());
+    weekData = data ? { days:data.days||{}, extraItems:data.extraItems||[], checked:data.checked||[], notes:data.notes||"" } : { days:{}, extraItems:[], checked:[], notes:"" };
+  }catch(e){ weekData = { days:{}, extraItems:[], checked:[], notes:"" }; }
+}
+function saveWeek(){
+  apiPut(storageKey(), weekData).catch(e=>console.error("save failed",e));
+}
+async function loadRecipeBank(){
+  try{
+    const data = await apiGet("recipe-bank");
+    if(data !== null && data !== undefined){
+      recipeBank = data;
+    } else {
+      recipeBank = SEED_RECIPES.slice();
+      await apiPut("recipe-bank", recipeBank);
+    }
+  }catch(e){ recipeBank = SEED_RECIPES.slice(); }
+}
+function saveRecipeBank(){
+  apiPut("recipe-bank", recipeBank).catch(e=>console.error("save failed",e));
+}
+async function switchWeek(newOffset){
+  saveWeek();
+  weekOffset=newOffset;
+  monday=addDays(getMonday(new Date()), weekOffset*7);
+  await loadWeek();
+  renderApp();
+}
+
+// One-time migration: if this browser has data from the old local-storage
+// version and the server doesn't have anything yet, copy it up so nothing
+// gets lost switching to server-backed storage.
+async function migrateLocalStorageIfNeeded(){
+  try{
+    const serverBank = await apiGet("recipe-bank");
+    if(serverBank === null){
+      const localBankRaw = localStorage.getItem("recipe-bank");
+      if(localBankRaw){
+        try{
+          const localBank = JSON.parse(localBankRaw);
+          if(Array.isArray(localBank) && localBank.length) await apiPut("recipe-bank", localBank);
+        }catch(e){}
+      }
+    }
+    for(let i=0; i<localStorage.length; i++){
+      const lsKey = localStorage.key(i);
+      if(lsKey && lsKey.indexOf("mealplan:")===0){
+        const existing = await apiGet(lsKey);
+        if(existing === null){
+          try{ await apiPut(lsKey, JSON.parse(localStorage.getItem(lsKey))); }catch(e){}
+        }
+      }
+    }
+  }catch(e){ console.error("Migration check failed (non-fatal):", e); }
+}
+
+// Other devices can change shared data; poll periodically and on tab focus
+// so this view catches up. Skipped while actively typing to avoid yanking
+// focus out from under someone mid-edit.
+function isEditingSomething(){
+  const el = document.activeElement;
+  return !!(el && (el.tagName==="INPUT" || el.tagName==="TEXTAREA"));
+}
+async function refreshFromServer(){
+  await checkDbHealth();
+  if(isEditingSomething()) return;
+  try{
+    const [bankData, weekDataFresh] = await Promise.all([ apiGet("recipe-bank"), apiGet(storageKey()) ]);
+    if(bankData !== null) recipeBank = bankData;
+    if(weekDataFresh !== null) weekData = { days:weekDataFresh.days||{}, extraItems:weekDataFresh.extraItems||[], checked:weekDataFresh.checked||[], notes:weekDataFresh.notes||"" };
+    renderApp();
+  }catch(e){ /* ignore transient network errors */ }
+}
+
+function addRecipeToBank(recipe){
+  recipeBank.push(Object.assign({}, recipe, {id: genId()}));
+  saveRecipeBank();
+}
+function removeRecipeFromBank(id){
+  recipeBank = recipeBank.filter(r=>r.id!==id);
+  saveRecipeBank();
+  renderApp();
+}
+function surpriseDay(day){
+  const used = DAYS.map(d=>weekData.days[d] && weekData.days[d].mealId).filter(Boolean);
+  const pool = recipeBank.filter(m=>!used.includes(m.id));
+  const source = pool.length?pool:recipeBank;
+  if(!source.length) return;
+  weekData.days[day] = { mealId: source[Math.floor(Math.random()*source.length)].id };
+}
+function fillWeekRandom(){
+  const used=[]; DAYS.forEach(d=>{ if(weekData.days[d]) used.push(weekData.days[d].mealId); });
+  DAYS.forEach(d=>{
+    if(weekData.days[d]) return;
+    const pool = recipeBank.filter(m=>!used.includes(m.id));
+    const source = pool.length?pool:recipeBank;
+    if(!source.length) return;
+    const pick = source[Math.floor(Math.random()*source.length)];
+    weekData.days[d] = { mealId: pick.id };
+    used.push(pick.id);
+  });
+}
+async function fetchRecipeFromLink(){
+  const input = document.getElementById("linkUrlInput");
+  const url = input ? input.value.trim() : "";
+  if(!url) return;
+  linkUrl = url; linkLoading = true; linkError = null; linkPreview = null;
+  renderApp();
+
+  // Read the page's own structured recipe data — most recipe sites embed this
+  // for Google's recipe rich-results, it's exact, and it needs no API key.
+  try{
+    const resp = await fetch("/api/import-recipe", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ url })
+    });
+    const data = await resp.json();
+    if(resp.ok && data.recipe){
+      const r = data.recipe;
+      const ingredients = (r.ingredientsRaw||[]).map(parseIngredientLine).filter(Boolean);
+      if(ingredients.length){
+        linkPreview = {
+          name: r.name || "Untitled recipe",
+          time: r.time || "",
+          tags: r.tags || [],
+          ingredients,
+          instructions: r.instructions || [],
+          sourceUrl: r.sourceUrl || url,
+        };
+        linkLoading = false;
+        renderApp();
+        return;
+      }
+    }
+    linkError = (data && data.error && data.error.message) ? data.error.message : "Couldn't find recipe data on that page. Try a different link, or add it manually below.";
+  }catch(e){
+    linkError = "Couldn't reach that page. Check the link and try again, or add the recipe manually below.";
+  }finally{
+    linkLoading = false;
+    renderApp();
+  }
+}
+function confirmAddLinkRecipe(){
+  if(!linkPreview) return;
+  addRecipeToBank(linkPreview);
+  linkPreview = null; linkUrl = ""; linkError = null;
+  renderApp();
+}
+function addManualRecipe(){
+  const nameEl = document.getElementById("manualNameInput");
+  const ingrEl = document.getElementById("manualIngredientsInput");
+  const instrEl = document.getElementById("manualInstructionsInput");
+  const name = nameEl ? nameEl.value.trim() : "";
+  if(!name) return;
+  const ingredients = (ingrEl?ingrEl.value:"").split("\n").map(parseIngredientLine).filter(Boolean);
+  if(!ingredients.length) return;
+  const instructions = (instrEl?instrEl.value:"").split("\n").map(s=>s.trim()).filter(Boolean);
+  addRecipeToBank({ name, time:"", tags:[], ingredients, instructions, sourceUrl:null });
+  showManualForm = false;
+  renderApp();
+}
+function startEditingRecipe(id){
+  editingRecipeId = id;
+  showManualForm = false;
+  linkPreview = null;
+  renderApp();
+}
+function cancelEditingRecipe(){
+  editingRecipeId = null;
+  renderApp();
+}
+function saveEditedRecipe(id){
+  const nameEl = document.getElementById("editNameInput");
+  const timeEl = document.getElementById("editTimeInput");
+  const ingrEl = document.getElementById("editIngredientsInput");
+  const instrEl = document.getElementById("editInstructionsInput");
+  const name = nameEl ? nameEl.value.trim() : "";
+  if(!name) return;
+  const ingredients = (ingrEl?ingrEl.value:"").split("\n").map(parseIngredientLine).filter(Boolean);
+  if(!ingredients.length) return;
+  const instructions = (instrEl?instrEl.value:"").split("\n").map(s=>s.trim()).filter(Boolean);
+  const time = timeEl ? timeEl.value.trim() : "";
+  const idx = recipeBank.findIndex(r=>r.id===id);
+  if(idx===-1) return;
+  recipeBank[idx] = Object.assign({}, recipeBank[idx], { name, time, ingredients, instructions });
+  saveRecipeBank();
+  editingRecipeId = null;
+  renderApp();
+}
+
+/* -------------------------------- rendering -------------------------------- */
+function optgroupHTML(label, meals){
+  if(!meals.length) return "";
+  return '<optgroup label="'+label+'">'+meals.map(m=>'<option value="'+m.id+'">'+escapeHTML(m.name)+'</option>').join("")+"</optgroup>";
+}
+function daySelectHTML(day){
+  const tags = ["quick","kid-friendly","slow","veg","freezer-friendly"];
+  const labelMap = { quick:"Quick (\u226430 min)", "kid-friendly":"Kid favorites", slow:"Slow cooker", veg:"Vegetarian", "freezer-friendly":"Freezes well" };
+  const taggedIds = new Set();
+  tags.forEach(tag=>{ recipeBank.filter(m=>(m.tags||[]).includes(tag)).forEach(m=>taggedIds.add(m.id)); });
+  const others = recipeBank.filter(m=>!taggedIds.has(m.id));
+  let html = '<select class="fmp-select" data-day="'+day+'">'
+    + '<option value="">\u2014 choose a meal \u2014</option>'
+    + '<option value="custom">\u270E Write my own</option>';
+  tags.forEach(tag=>{
+    const matches = recipeBank.filter(m=>(m.tags||[]).includes(tag));
+    if(matches.length) html += optgroupHTML(labelMap[tag], matches);
+  });
+  if(others.length) html += optgroupHTML("More recipes", others);
+  html += '</select>';
+  return html;
+}
+function dayCardHTML(day, idx){
+  const entry = weekData.days[day];
+  const meal = entry && entry.mealId ? recipeBank.find(m=>m.id===entry.mealId) : null;
+  const isCustom = entry && !entry.mealId && entry.customName !== undefined;
+
+  let body = "";
+  if(!meal && !isCustom){
+    body = daySelectHTML(day)
+      + '<div class="fmp-day-actions" style="justify-content:flex-start;margin-top:8px;">'
+      + '<button class="fmp-btn-ghost" style="padding:6px 12px;font-size:12px;" data-action="surprise-day" data-day="'+day+'">\u21C4 Surprise me</button></div>';
+  } else if(meal){
+    body = '<div class="fmp-meal-card">'
+      + '<div class="fmp-meal-name">'+escapeHTML(meal.name)+'</div>'
+      + '<div class="fmp-meal-meta">' + (meal.time?'<span class="fmp-tag time">'+escapeHTML(meal.time)+'</span>':'')
+      + (meal.tags||[]).map(t=>'<span class="fmp-tag">'+(TAG_LABEL[t]||t)+'</span>').join("")
+      + '</div>'
+      + '<div class="fmp-ingr-list">'+escapeHTML(meal.ingredients.map(i=>i.name).join(", "))+'</div>'
+      + '<div class="fmp-day-actions">'
+      + '<button class="fmp-icon-btn" data-action="view-meal" data-day="'+day+'" title="View recipe">\uD83D\uDC41</button>'
+      + '<button class="fmp-icon-btn" data-action="clear-day" data-day="'+day+'" title="Remove">\u2715</button>'
+      + '</div></div>';
+  } else if(isCustom){
+    body = '<div class="fmp-custom">'
+      + '<label>Meal name</label>'
+      + '<input type="text" placeholder="e.g. Grandma\u2019s lasagna" data-day="'+day+'" data-field="name" value="'+escapeAttr(entry.customName||"")+'" />'
+      + '<label>Ingredients (one per line, qty first \u2014 "2 lb chicken thighs")</label>'
+      + '<textarea data-day="'+day+'" data-field="ingredients" placeholder="2 lb chicken thighs&#10;1 onion&#10;garlic">'+escapeHTML(entry.customIngredients||"")+'</textarea>'
+      + '<div class="fmp-day-actions">'
+      + '<button class="fmp-icon-btn" data-action="view-custom" data-day="'+day+'" title="View">\uD83D\uDC41</button>'
+      + '<button class="fmp-icon-btn" data-action="clear-day" data-day="'+day+'" title="Remove">\u2715</button>'
+      + '</div></div>';
+  }
+  return '<div class="fmp-day"><div class="fmp-day-head"><span class="fmp-day-name">'+DAY_FULL[day]+'</span>'
+    + '<span class="fmp-day-date">'+formatDayDate(monday, idx)+'</span></div>'+body+'</div>';
+}
+function notesRowHTML(){
+  return '<div class="fmp-notes-row">'
+    + '<button class="fmp-btn-ghost" data-action="toggle-bank">\uD83D\uDCD6 Recipe bank ('+recipeBank.length+')</button>'
+    + '<button class="fmp-btn-ghost" data-action="fill-week">\u21C4 Fill empty days</button>'
+    + '</div>';
+}
+function editRecipeFormHTML(recipe){
+  return '<div class="fmp-manual-form">'
+    + '<label style="font-size:11px;color:#8b8474;text-transform:uppercase;letter-spacing:.04em;">Editing recipe</label>'
+    + '<input type="text" id="editNameInput" placeholder="Recipe name" value="'+escapeAttr(recipe.name)+'" />'
+    + '<input type="text" id="editTimeInput" placeholder="Time (e.g. 30 min)" value="'+escapeAttr(recipe.time||"")+'" />'
+    + '<label style="font-size:11px;color:#8b8474;text-transform:uppercase;letter-spacing:.04em;">Ingredients (one per line \u2014 "2 lb chicken thighs")</label>'
+    + '<textarea id="editIngredientsInput">'+escapeHTML(ingredientsToLines(recipe.ingredients))+'</textarea>'
+    + '<label style="font-size:11px;color:#8b8474;text-transform:uppercase;letter-spacing:.04em;">Steps (one per line)</label>'
+    + '<textarea id="editInstructionsInput">'+escapeHTML((recipe.instructions||[]).join("\n"))+'</textarea>'
+    + '<div style="display:flex;gap:8px;">'
+    + '<button class="fmp-btn-ghost" data-action="cancel-edit">Cancel</button>'
+    + '<button class="fmp-btn-primary" data-action="save-edit" data-id="'+recipe.id+'">Save changes</button>'
+    + '</div></div>';
+}
+function bankPanelHTML(){
+  if(!showBank) return "";
+  let html = '<div class="fmp-recipebank">';
+  html += '<div class="fmp-recipebank-head"><span class="fmp-recipebank-title">Recipe bank</span>'
+    + '<button class="fmp-icon-btn" data-action="close-bank" title="Close">\u2715</button></div>';
+  html += '<div class="fmp-link-form">'
+    + '<input type="text" id="linkUrlInput" placeholder="Paste a recipe link\u2026" value="'+escapeAttr(linkUrl)+'" />'
+    + '<button class="fmp-btn-primary" data-action="fetch-link"'+(linkLoading?" disabled":"")+'>'
+    + (linkLoading ? '<span class="fmp-spin">\u27F3</span> Reading\u2026' : '\uD83D\uDD17 Fetch')
+    + '</button></div>';
+  if(linkError) html += '<div class="fmp-form-error" style="margin-bottom:10px;">'+escapeHTML(linkError)+'</div>';
+  if(linkPreview){
+    html += '<div class="fmp-link-preview">'
+      + '<div class="fmp-meal-name">'+escapeHTML(linkPreview.name)+'</div>'
+      + '<div class="fmp-meal-meta">' + (linkPreview.time?'<span class="fmp-tag time">'+escapeHTML(linkPreview.time)+'</span>':'')
+      + linkPreview.tags.map(t=>'<span class="fmp-tag">'+(TAG_LABEL[t]||t)+'</span>').join("")
+      + '</div>'
+      + '<div class="fmp-ingr-list">'+escapeHTML(linkPreview.ingredients.map(i=>i.name).join(", "))+'</div>'
+      + '<div class="fmp-link-preview-actions">'
+      + '<button class="fmp-btn-ghost" data-action="discard-link">Discard</button>'
+      + '<button class="fmp-btn-primary" data-action="confirm-link">+ Add to bank</button>'
+      + '</div></div>';
+  }
+  html += '<span class="fmp-manual-toggle" data-action="toggle-manual">'+(showManualForm?"Cancel manual entry":"+ Add a recipe manually")+'</span>';
+  if(showManualForm){
+    html += '<div class="fmp-manual-form">'
+      + '<input type="text" id="manualNameInput" placeholder="Recipe name" />'
+      + '<textarea id="manualIngredientsInput" placeholder="Ingredients, one per line \u2014 &quot;2 lb chicken thighs&quot;"></textarea>'
+      + '<textarea id="manualInstructionsInput" placeholder="Steps, one per line"></textarea>'
+      + '<button class="fmp-btn-primary" style="align-self:flex-start;" data-action="add-manual">+ Add recipe</button>'
+      + '</div>';
+  }
+  const editingRecipe = editingRecipeId ? recipeBank.find(r=>r.id===editingRecipeId) : null;
+  if(editingRecipe) html += editRecipeFormHTML(editingRecipe);
+  html += '<div class="fmp-recipe-list">';
+  recipeBank.slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach(r=>{
+    const meta = [r.time].concat((r.tags||[]).map(t=>TAG_LABEL[t]||t)).filter(Boolean).join(" \u00B7 ") || "\u2014";
+    html += '<div class="fmp-recipe-row">'
+      + '<div class="fmp-recipe-row-info"><span class="fmp-recipe-row-name">'+escapeHTML(r.name)+'</span>'
+      + '<span class="fmp-recipe-row-meta">'+escapeHTML(meta)+'</span></div>'
+      + '<div class="fmp-recipe-row-actions">'
+      + '<button class="fmp-icon-btn" data-action="view-bank-recipe" data-id="'+r.id+'" title="View recipe">\uD83D\uDC41</button>'
+      + '<button class="fmp-icon-btn" data-action="edit-recipe" data-id="'+r.id+'" title="Edit recipe">\u270F\uFE0F</button>'
+      + '<button class="fmp-icon-btn" data-action="remove-recipe" data-id="'+r.id+'" title="Remove">\uD83D\uDDD1</button>'
+      + '</div></div>';
+  });
+  html += '</div></div>';
+  return html;
+}
+function receiptInnerHTML(){
+  const list = buildShoppingList(weekData, recipeBank);
+  const checkedSet = new Set(weekData.checked||[]);
+  let bodyHTML;
+  if(list.sections.length===0){
+    bodyHTML = '<div class="fmp-empty">Add meals to the week and your ingredients will collect here \u2014 merged automatically when more than one meal needs the same thing.</div>';
+  } else {
+    bodyHTML = '<div class="fmp-receipt-body">' + list.sections.map(section=>{
+      return '<div class="fmp-section-label">'+section.name+'</div>' + section.items.map(it=>{
+        const key = it.name.toLowerCase()+"|"+((it.unit||"").toLowerCase());
+        const done = checkedSet.has(key);
+        const qty = it.unit ? (formatQty(it.qty)+" "+it.unit) : formatQty(it.qty);
+        return '<div class="fmp-item-row'+(done?" done":"")+'" data-action="toggle-check" data-key="'+escapeAttr(key)+'">'
+          + '<span class="fmp-checkbox'+(done?" on":"")+'">'+(done?"\u2713":"")+'</span>'
+          + '<span class="fmp-item-name">'+escapeHTML(it.name)+'</span>'
+          + '<span class="fmp-item-leader"></span>'
+          + '<span class="fmp-item-qty">'+qty+(it.sources.size>1 ? '<span class="fmp-item-src">\u00D7'+it.sources.size+' meals</span>' : '')+'</span>'
+          + '</div>';
+      }).join("");
+    }).join("") + '</div>';
+  }
+  const extraListHTML = (weekData.extraItems||[]).map((t,i)=>{
+    return '<div class="fmp-extra-item"><span>'+escapeHTML(t)+'</span><button data-action="remove-extra" data-idx="'+i+'">\u2715</button></div>';
+  }).join("");
+  return '<div class="fmp-receipt-top"></div>'
+    + '<div class="fmp-receipt-head"><span class="fmp-receipt-title">\uD83D\uDED2 Shopping list</span>'
+    + '<span class="fmp-receipt-count">'+list.totalCount+' item'+(list.totalCount===1?"":"s")+'</span></div>'
+    + bodyHTML
+    + '<div class="fmp-extra">'
+    + '<label style="font-size:11px;color:#8b8474;text-transform:uppercase;letter-spacing:.04em;">Add your own item</label>'
+    + '<div class="fmp-extra-form"><input type="text" id="extraInput" placeholder="e.g. 2 gal milk" />'
+    + '<button data-action="add-extra">+</button></div>'
+    + (extraListHTML ? '<div class="fmp-extra-list">'+extraListHTML+'</div>' : '')
+    + '</div>'
+    + '<div class="fmp-receipt-actions">'
+    + '<button data-action="copy-list">\u29C9 Copy list</button>'
+    + '<button data-action="clear-checks">\uD83D\uDDD1 Clear checks</button>'
+    + '</div>'
+    + '<div class="fmp-copied" id="copiedMsg">Copied to clipboard</div>';
+}
+function updateReceipt(){
+  const el = document.getElementById("receipt");
+  if(el) el.innerHTML = receiptInnerHTML();
+}
+function renderApp(){
+  const root = document.getElementById("app");
+  root.innerHTML = '<div class="fmp-wrap">'
+    + (!dbConnected ? '<div class="fmp-db-banner">\u26A0\uFE0F Not connected to the database \u2014 changes won\u2019t be saved right now. Check the server\u2019s MONGODB_URI setup.</div>' : '')
+    + '<div class="fmp-header"><div><h1 class="fmp-title">This week\u2019s <em>table</em></h1>'
+    + '<div class="fmp-subtitle">Plan dinners, pull the shopping list, go.</div></div>'
+    + '<div class="fmp-weeknav"><button data-action="prev-week">\u2039</button>'
+    + '<span>'+formatWeekRange(monday)+'</span>'
+    + '<button data-action="next-week">\u203A</button></div></div>'
+    + notesRowHTML()
+    + bankPanelHTML()
+    + '<div class="fmp-grid">'
+    + '<div class="fmp-days">' + DAYS.map((d,i)=>dayCardHTML(d,i)).join("") + '</div>'
+    + '<div class="fmp-receipt" id="receipt">' + receiptInnerHTML() + '</div>'
+    + '</div>'
+    + '<div class="fmp-savenote">Weekly menus and your recipe bank are saved to the shared database \u2014 visible on every device that opens this app.</div>'
+    + '</div>';
+}
+function modalHTML(){
+  if(!cookingRecipe) return "";
+  const r = cookingRecipe;
+  const ingredientsHTML = r.ingredients.map(ing=>{
+    const qty = ing.unit ? (formatQty(ing.qty)+" "+ing.unit) : formatQty(ing.qty);
+    return '<div class="fmp-modal-ingredient"><span class="qty">'+escapeHTML(qty)+'</span><span>'+escapeHTML(ing.name)+'</span></div>';
+  }).join("");
+  let stepsHTML;
+  if(r.instructions && r.instructions.length){
+    stepsHTML = '<div class="fmp-modal-steps">' + r.instructions.map((s,i)=>'<div class="fmp-modal-step"><span class="fmp-modal-step-num">'+(i+1)+'</span><span>'+escapeHTML(s)+'</span></div>').join("") + '</div>';
+  } else {
+    stepsHTML = '<div class="fmp-modal-empty-steps">No steps saved for this recipe.</div>';
+  }
+  const sourceHTML = r.sourceUrl ? '<div class="fmp-modal-source"><a href="'+escapeAttr(r.sourceUrl)+'" target="_blank" rel="noopener noreferrer">Original recipe \u2197</a></div>' : '';
+  return '<div class="fmp-modal-backdrop">'
+    + '<div class="fmp-modal">'
+    + '<button class="fmp-modal-close" title="Close">\u2715</button>'
+    + '<h2 class="fmp-modal-title">'+escapeHTML(r.name)+'</h2>'
+    + '<div class="fmp-modal-meta">' + (r.time?'<span class="fmp-tag time">'+escapeHTML(r.time)+'</span>':'')
+    + (r.tags||[]).map(t=>'<span class="fmp-tag">'+(TAG_LABEL[t]||t)+'</span>').join("")
+    + '</div>'
+    + '<div class="fmp-modal-section-title">Ingredients</div>'
+    + '<div class="fmp-modal-ingredients">'+ingredientsHTML+'</div>'
+    + '<div class="fmp-modal-section-title">Steps</div>'
+    + stepsHTML
+    + sourceHTML
+    + '</div></div>';
+}
+function renderModal(){
+  document.getElementById("modal-root").innerHTML = modalHTML();
+}
+
+/* --------------------------------- events --------------------------------- */
+function addExtraFromInput(){
+  const input = document.getElementById("extraInput");
+  if(!input) return;
+  const val = input.value.trim();
+  if(!val) return;
+  if(!weekData.extraItems) weekData.extraItems=[];
+  weekData.extraItems.push(val);
+  saveWeek();
+  updateReceipt();
+}
+async function copyToClipboard(text){
+  // navigator.clipboard requires a "secure context" (https, or localhost).
+  // A plain http://<lan-ip> address from another device on the network isn't
+  // one, so it silently doesn't exist there — fall back to the old
+  // select-a-hidden-textarea-and-execCommand trick, which works everywhere.
+  if(window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText){
+    try{ await navigator.clipboard.writeText(text); return true; }catch(e){ /* fall through */ }
+  }
+  try{
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.top = "-9999px";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  }catch(e){
+    return false;
+  }
+}
+async function copyList(){
+  const list = buildShoppingList(weekData, recipeBank);
+  const checkedSet = new Set(weekData.checked||[]);
+  const lines = [];
+  list.sections.forEach(s=>{
+    lines.push(s.name.toUpperCase());
+    s.items.forEach(it=>{
+      const key = it.name.toLowerCase()+"|"+((it.unit||"").toLowerCase());
+      const mark = checkedSet.has(key) ? "[x]" : "[ ]";
+      const qty = it.unit ? (formatQty(it.qty)+" "+it.unit) : formatQty(it.qty);
+      lines.push(mark+" "+it.name+" \u2014 "+qty);
+    });
+    lines.push("");
+  });
+  const ok = await copyToClipboard(lines.join("\n"));
+  const msg = document.getElementById("copiedMsg");
+  if(msg){
+    msg.textContent = ok ? "Copied to clipboard" : "Couldn't copy automatically \u2014 select and copy the list manually";
+    msg.style.display = "block";
+    setTimeout(()=>{ msg.style.display="none"; }, ok ? 1800 : 3500);
+  }
+}
+
+function onClick(e){
+  const btn = e.target.closest("[data-action]");
+  if(!btn) return;
+  const action = btn.dataset.action;
+  const day = btn.dataset.day;
+  if(action==="prev-week"){ switchWeek(weekOffset-1); }
+  else if(action==="next-week"){ switchWeek(weekOffset+1); }
+  else if(action==="fill-week"){ fillWeekRandom(); saveWeek(); renderApp(); }
+  else if(action==="toggle-bank"){ showBank = !showBank; renderApp(); }
+  else if(action==="close-bank"){ showBank = false; renderApp(); }
+  else if(action==="fetch-link"){ fetchRecipeFromLink(); }
+  else if(action==="discard-link"){ linkPreview = null; renderApp(); }
+  else if(action==="confirm-link"){ confirmAddLinkRecipe(); }
+  else if(action==="toggle-manual"){ showManualForm = !showManualForm; renderApp(); }
+  else if(action==="add-manual"){ addManualRecipe(); }
+  else if(action==="view-bank-recipe"){ const r = recipeBank.find(x=>x.id===btn.dataset.id); if(r){ cookingRecipe = r; renderModal(); } }
+  else if(action==="edit-recipe"){ startEditingRecipe(btn.dataset.id); }
+  else if(action==="cancel-edit"){ cancelEditingRecipe(); }
+  else if(action==="save-edit"){ saveEditedRecipe(btn.dataset.id); }
+  else if(action==="remove-recipe"){ removeRecipeFromBank(btn.dataset.id); }
+  else if(action==="clear-day"){ delete weekData.days[day]; saveWeek(); renderApp(); }
+  else if(action==="surprise-day"){ surpriseDay(day); saveWeek(); renderApp(); }
+  else if(action==="view-meal"){ const entry = weekData.days[day]; const m = recipeBank.find(x=>x.id===entry.mealId); if(m){ cookingRecipe=m; renderModal(); } }
+  else if(action==="view-custom"){ const entry = weekData.days[day]; cookingRecipe = { name: (entry && entry.customName) || "Custom meal", time:"", tags:[], ingredients:((entry && entry.customIngredients)||"").split("\n").map(parseIngredientLine).filter(Boolean), instructions:[], sourceUrl:null }; renderModal(); }
+  else if(action==="toggle-check"){
+    const key = btn.dataset.key;
+    const has = (weekData.checked||[]).includes(key);
+    weekData.checked = has ? weekData.checked.filter(k=>k!==key) : [...(weekData.checked||[]), key];
+    saveWeek(); updateReceipt();
+  }
+  else if(action==="add-extra"){ addExtraFromInput(); }
+  else if(action==="remove-extra"){ weekData.extraItems.splice(parseInt(btn.dataset.idx,10),1); saveWeek(); updateReceipt(); }
+  else if(action==="copy-list"){ copyList(); }
+  else if(action==="clear-checks"){ weekData.checked=[]; saveWeek(); updateReceipt(); }
+}
+function onChange(e){
+  const sel = e.target.closest("select.fmp-select");
+  if(!sel) return;
+  const day = sel.dataset.day, val = sel.value;
+  if(val===""){ delete weekData.days[day]; }
+  else if(val==="custom"){ weekData.days[day] = { customName:"", customIngredients:"" }; }
+  else { weekData.days[day] = { mealId: val }; }
+  saveWeek(); renderApp();
+}
+function onInput(e){
+  const field = e.target.closest("[data-field]");
+  if(field){
+    const day = field.dataset.day;
+    const fkey = field.dataset.field;
+    if(!weekData.days[day]) weekData.days[day] = {};
+    if(fkey==="name") weekData.days[day].customName = field.value;
+    else if(fkey==="ingredients") weekData.days[day].customIngredients = field.value;
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(()=>{ saveWeek(); if(fkey==="ingredients") updateReceipt(); }, 350);
+    return;
+  }
+}
+function onKeydown(e){
+  if(e.target && e.target.id==="extraInput" && e.key==="Enter"){ addExtraFromInput(); }
+  if(e.target && e.target.id==="linkUrlInput" && e.key==="Enter"){ fetchRecipeFromLink(); }
+}
+
+async function init(){
+  const root = document.getElementById("app");
+  root.addEventListener("click", onClick);
+  root.addEventListener("change", onChange);
+  root.addEventListener("input", onInput);
+  root.addEventListener("keydown", onKeydown);
+  document.getElementById("modal-root").addEventListener("click", (e)=>{
+    if(e.target.classList.contains("fmp-modal-backdrop") || e.target.closest(".fmp-modal-close")){
+      cookingRecipe = null; renderModal();
+    }
+  });
+
+  root.innerHTML = '<div style="padding:60px 20px;text-align:center;color:#8b8474;font-family:Karla,sans-serif;">Loading\u2026</div>';
+  await checkDbHealth();
+  await migrateLocalStorageIfNeeded();
+  await loadRecipeBank();
+  await loadWeek();
+  renderApp();
+  renderModal();
+
+  setInterval(refreshFromServer, 20000);
+  document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) refreshFromServer(); });
+}
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>
