@@ -3,6 +3,10 @@ const express = require("express");
 const path = require("path");
 const os = require("os");
 const { MongoClient } = require("mongodb");
+const session = require("express-session");
+const MongoStore = require("connect-mongo");
+const passport = require("passport");
+const GoogleStrategy = require("passport-google-oauth20").Strategy;
 
 // Node 18+ has fetch built in. On older Node versions, fall back to node-fetch.
 const fetch = global.fetch || require("node-fetch");
@@ -12,7 +16,123 @@ const PORT = process.env.PORT || 3000;
 const MONGODB_URI = process.env.MONGODB_URI;
 const DB_NAME = process.env.MONGODB_DB_NAME || "meal_planner";
 
+// Render (and most hosts) sit behind a reverse proxy that terminates HTTPS
+// and forwards plain HTTP internally. Without this, Express can't tell the
+// original connection was secure, and "secure" session cookies never get set.
+app.set("trust proxy", 1);
+
 app.use(express.json({ limit: "2mb" }));
+
+/* ---- Google login, gating access to a fixed list of allowed emails ---- */
+
+const ALLOWED_EMAILS = new Set(
+  (process.env.ALLOWED_EMAILS || "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean)
+);
+function isAuthorized(email) {
+  return !!email && ALLOWED_EMAILS.has(String(email).toLowerCase());
+}
+
+const authEnabled = !!(
+  MONGODB_URI &&
+  process.env.SESSION_SECRET &&
+  process.env.GOOGLE_CLIENT_ID &&
+  process.env.GOOGLE_CLIENT_SECRET
+);
+
+if (!authEnabled) {
+  console.log("\n⚠️  Login isn't fully configured (need MONGODB_URI, SESSION_SECRET,");
+  console.log("   GOOGLE_CLIENT_ID, and GOOGLE_CLIENT_SECRET in .env) — sign-in is disabled");
+  console.log("   and the app will refuse all data access until it's set up. See the README.\n");
+}
+
+if (authEnabled) {
+  const sessionStore = MongoStore.create({ mongoUrl: MONGODB_URI, dbName: DB_NAME, collectionName: "sessions" });
+  // connect-mongo emits 'error' on connection problems; Node treats an unhandled
+  // 'error' event as fatal and kills the whole process, so this listener is
+  // required, not optional — without it, a bad/unreachable MONGODB_URI crashes
+  // the entire server instead of just disabling login gracefully.
+  sessionStore.on("error", (err) => {
+    console.error("\n⚠️  Session store (MongoDB) connection error:", err.message);
+    console.error("   Sign-in may not work until this is fixed.\n");
+  });
+
+  app.use(
+    session({
+      secret: process.env.SESSION_SECRET,
+      resave: false,
+      saveUninitialized: false,
+      store: sessionStore,
+      cookie: {
+        httpOnly: true,
+        secure: "auto", // set the Secure flag automatically based on the (proxy-aware) request protocol
+        sameSite: "lax",
+        maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
+      },
+    })
+  );
+  app.use(passport.initialize());
+  app.use(passport.session());
+
+  passport.serializeUser((user, done) => done(null, user));
+  passport.deserializeUser((user, done) => done(null, user));
+
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: process.env.GOOGLE_CALLBACK_URL || "/auth/google/callback",
+      },
+      (accessToken, refreshToken, profile, done) => {
+        const email = profile.emails && profile.emails[0] && profile.emails[0].value;
+        const name = profile.displayName || (email ? email.split("@")[0] : "there");
+        const picture = profile.photos && profile.photos[0] && profile.photos[0].value;
+        return done(null, { email, name, picture });
+      }
+    )
+  );
+
+  app.get("/auth/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+
+  app.get(
+    "/auth/google/callback",
+    passport.authenticate("google", { failureRedirect: "/" }),
+    (req, res) => res.redirect("/")
+  );
+
+  app.get("/auth/logout", (req, res) => {
+    req.logout(() => res.redirect("/"));
+  });
+}
+
+app.get("/api/me", (req, res) => {
+  const authenticated = authEnabled && req.isAuthenticated && req.isAuthenticated();
+  const email = authenticated ? req.user.email : null;
+  res.json({
+    authConfigured: authEnabled,
+    authenticated: !!authenticated,
+    authorized: authenticated && isAuthorized(email),
+    email,
+    name: authenticated ? req.user.name : null,
+  });
+});
+
+function requireAuthorizedUser(req, res, next) {
+  if (!authEnabled) {
+    return res.status(503).json({ error: { message: "Login isn't configured on this server yet." } });
+  }
+  if (!req.isAuthenticated || !req.isAuthenticated()) {
+    return res.status(401).json({ error: { message: "Sign in to continue." } });
+  }
+  if (!isAuthorized(req.user.email)) {
+    return res.status(403).json({ error: { message: "This Google account isn't authorized for this app." } });
+  }
+  next();
+}
+
 app.use(express.static(path.join(__dirname, "public")));
 
 /* ---- Key/value store, backed by a MongoDB Atlas collection ---- */
@@ -44,7 +164,7 @@ app.get("/api/health", (req, res) => {
   res.json({ ok: !!collection });
 });
 
-app.get("/api/data/:key", async (req, res) => {
+app.get("/api/data/:key", requireAuthorizedUser, async (req, res) => {
   if (!collection) {
     return res.status(503).json({ error: { message: "Not connected to the database. Check the server's MONGODB_URI setup." } });
   }
@@ -57,7 +177,7 @@ app.get("/api/data/:key", async (req, res) => {
   }
 });
 
-app.put("/api/data/:key", async (req, res) => {
+app.put("/api/data/:key", requireAuthorizedUser, async (req, res) => {
   if (!collection) {
     return res.status(503).json({ error: { message: "Not connected to the database. Check the server's MONGODB_URI setup." } });
   }
@@ -197,7 +317,7 @@ function extractRecipeFromHTML(html, url) {
   };
 }
 
-app.post("/api/import-recipe", async (req, res) => {
+app.post("/api/import-recipe", requireAuthorizedUser, async (req, res) => {
   const { url } = req.body || {};
   if (!url || typeof url !== "string") {
     return res.status(400).json({ error: { message: "Missing url." } });
@@ -244,6 +364,16 @@ function getLanAddresses() {
   }
   return addresses;
 }
+
+// Last line of defense: log and keep running rather than let one bad async
+// error (e.g. a transient DB hiccup somewhere we didn't explicitly catch)
+// take the whole server down for every family member using it.
+process.on("unhandledRejection", (err) => {
+  console.error("\n⚠️  Unhandled error (server is still running):", err);
+});
+process.on("uncaughtException", (err) => {
+  console.error("\n⚠️  Uncaught error (server is still running):", err);
+});
 
 async function start() {
   await connectDB();

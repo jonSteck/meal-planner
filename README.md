@@ -1,8 +1,10 @@
 # Family Meal Planner (local)
 
-A weekly meal planner and shopping list that runs entirely on your laptop.
-Includes a recipe bank you can add to by pasting a recipe link (or entering
-recipes manually), and a cooking view for following recipes step-by-step.
+A weekly meal planner and shopping list, shared across your family's
+devices via MongoDB Atlas, gated behind Google sign-in so only people you
+approve can get in. Includes a recipe bank you can add to by pasting a
+recipe link (or entering recipes manually), and a cooking view for
+following recipes step-by-step.
 
 ## Setup (one time)
 
@@ -46,18 +48,49 @@ recipes manually), and a cooking view for following recipes step-by-step.
       mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority
       ```
 
-5. **Add the connection string to this project.** Copy the example env
-   file:
+5. **Set up Google sign-in.** This app requires signing in with Google, and
+   only lets in the specific accounts you allow. It takes about five minutes:
+
+   a. Go to https://console.cloud.google.com/ and create a project (or use
+      an existing one) — top-left project dropdown > New Project.
+
+   b. Go to **APIs & Services > OAuth consent screen**. Choose **External**,
+      fill in the required fields (app name, your email), and save. You can
+      leave it in "Testing" mode — that's fine for a private family app, it
+      just means only accounts you explicitly add can sign in (see step d).
+
+   c. Go to **APIs & Services > Credentials > Create Credentials > OAuth
+      client ID**. Choose **Web application**. Under **Authorized redirect
+      URIs**, add:
+      ```
+      http://localhost:3000/auth/google/callback
+      ```
+      (add your Render URL's equivalent here too once you deploy — see the
+      deployment note near the bottom). Save, then copy the **Client ID**
+      and **Client Secret** it gives you.
+
+   d. Still on the OAuth consent screen, if it's in Testing mode, scroll to
+      **Test users** and add the Google account emails that should be able
+      to sign in — this needs to match `ALLOWED_EMAILS` below.
+
+6. **Add everything to your `.env` file.** Copy the example:
    ```
    cp .env.example .env
    ```
-   Then open `.env` in any text editor and paste your connection string in,
-   replacing `<username>` and `<password>` with the real values from step 4c:
+   Then open `.env` and fill in:
    ```
    MONGODB_URI=mongodb+srv://myuser:mypassword@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority
+   SESSION_SECRET=<a random string — see the comment in .env.example for how to generate one>
+   GOOGLE_CLIENT_ID=<from step 5c>
+   GOOGLE_CLIENT_SECRET=<from step 5c>
+   GOOGLE_CALLBACK_URL=http://localhost:3000/auth/google/callback
+   ALLOWED_EMAILS=you@gmail.com, partner@gmail.com
    ```
+   `ALLOWED_EMAILS` is the full list of who gets access — anyone who signs
+   in with a Google account not on this list will see a clear "not
+   authorized" message instead of the app.
 
-6. **Start the server:**
+7. **Start the server:**
    ```
    npm start
    ```
@@ -69,13 +102,25 @@ recipes manually), and a cooking view for following recipes step-by-step.
    If instead you see a warning about not being connected, double check the
    connection string and the Network Access step above.
 
-7. **Open** http://localhost:3000 **in your browser.**
+8. **Open** http://localhost:3000 **in your browser** and sign in with
+   Google.
 
 ## Using it again later
 
-Just repeat step 6 and 7 — open Terminal, `cd` into the folder, run
+Just repeat step 7 and 8 — open Terminal, `cd` into the folder, run
 `npm start`, then open the URL. Keep the Terminal window open while you use
 the planner; closing it stops the server.
+
+## Who can access it
+
+Only Google accounts listed in `ALLOWED_EMAILS` (in `.env`) get in — anyone
+else who signs in sees a "not authorized" screen with no access to your
+data. To add or remove someone, edit `ALLOWED_EMAILS` and restart the
+server (and add/remove them as a test user in the Google Cloud Console if
+your OAuth consent screen is still in Testing mode).
+
+Each signed-in person's name/email shows in the top-right of the app, with
+a Sign out link.
 
 ## Using it from other devices on your network
 
@@ -134,6 +179,22 @@ dynamically via JavaScript, or are paywalled), you'll be prompted to add
 the recipe manually instead — quick, and always works. Every recipe in the
 bank, imported or manual, can also be edited afterward with the pencil icon.
 
+## Deploying to Render (or anywhere else)
+
+Since data lives in MongoDB Atlas and sessions do too, this app has no
+local state — it's already safe to deploy to a host like Render with an
+ephemeral filesystem. Two things to update when you do:
+
+- Add your deployed URL's callback as another **Authorized redirect URI**
+  in the Google Cloud Console (step 5c above), e.g.
+  `https://your-app.onrender.com/auth/google/callback`, and set
+  `GOOGLE_CALLBACK_URL` to that same value in your Render environment
+  variables (not `.env` — Render doesn't read that file; set the same
+  variables in its dashboard instead).
+- Once you're happy with it, you can move the OAuth consent screen from
+  Testing to Production in Google Cloud Console if you want to skip the
+  "test users" list — `ALLOWED_EMAILS` will still be the real gate either way.
+
 ## Troubleshooting
 
 - **Port already in use** — another program is using port 3000. Set a
@@ -143,6 +204,16 @@ bank, imported or manual, can also be edited afterward with the pencil icon.
   characters (if your password has `@`, `:`, `/`, or similar, URL-encode
   it, or regenerate a simpler password in Atlas), and that your current
   network is allowed under Atlas's Network Access settings.
+- **"Login isn't fully configured" screen** — one of `MONGODB_URI`,
+  `SESSION_SECRET`, `GOOGLE_CLIENT_ID`, or `GOOGLE_CLIENT_SECRET` is
+  missing from `.env`.
+- **Google shows an error page instead of the sign-in screen** — usually
+  means the redirect URI Google received doesn't exactly match one of the
+  "Authorized redirect URIs" on your OAuth client (check for a trailing
+  slash mismatch or http vs. https), or the OAuth consent screen is in
+  Testing mode and your account isn't added as a test user.
+- **Signed in but see "Not authorized"** — your email isn't in
+  `ALLOWED_EMAILS`. Add it and restart the server.
 - **Recipe link import comes back empty or wrong** — extraction quality
   depends on the recipe site; you'll see a preview before it's added, and
   can discard and add the recipe manually instead, or edit it after adding.

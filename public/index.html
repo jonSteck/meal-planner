@@ -123,6 +123,13 @@ html, body { margin:0; padding:0; background:#F6F1E3; color-scheme: light; }
 #modal-root { font-family:'Karla',sans-serif; color:var(--ink); color-scheme: light; }
 .fmp-savenote { font-size:11.5px; color:#a39c8a; text-align:center; margin-top:18px; }
 .fmp-db-banner { background:#FCEEE9; border:1px solid #E8B7A5; color:#8a3d20; font-size:13px; font-weight:600; padding:10px 16px; border-radius:10px; margin-bottom:16px; }
+.fmp-user-line { font-size:11.5px; color:#8b8474; }
+.fmp-user-line a { color:var(--sage-dark); text-decoration:none; }
+.fmp-user-line a:hover { text-decoration:underline; }
+.fmp-gate-card { background:#FFFDF7; border:1px solid var(--line); border-radius:16px; padding:40px 34px; text-align:center; }
+.fmp-gate-title { font-family:'Fraunces',serif; font-weight:600; font-size:26px; margin:0 0 12px; }
+.fmp-gate-text { font-size:14px; color:#6b6558; line-height:1.6; margin-bottom:24px; }
+.fmp-gate-email { font-family:'IBM Plex Mono',monospace; font-size:13px; background:var(--paper); padding:2px 8px; border-radius:6px; }
 
 .fmp-modal-backdrop { position:fixed; inset:0; background:rgba(43,42,40,0.45); display:flex; align-items:center; justify-content:center; padding:24px; z-index:50; }
 .fmp-modal { background:var(--card); border-radius:18px; max-width:640px; width:100%; max-height:85vh; overflow-y:auto; padding:28px 30px 30px; position:relative; }
@@ -365,15 +372,17 @@ async function checkDbHealth(){
 /* ---- Server-backed storage (shared across every device hitting this server) ---- */
 async function apiGet(key){
   const res = await fetch("/api/data/"+encodeURIComponent(key));
+  if(res.status===401 || res.status===403){ location.reload(); return null; }
   const data = await res.json();
   return data.value;
 }
 async function apiPut(key, value){
-  await fetch("/api/data/"+encodeURIComponent(key), {
+  const res = await fetch("/api/data/"+encodeURIComponent(key), {
     method: "PUT",
     headers: {"Content-Type":"application/json"},
     body: JSON.stringify({ value })
   });
+  if(res.status===401 || res.status===403){ location.reload(); }
 }
 
 function storageKey(){ return "mealplan:"+isoDate(monday); }
@@ -746,9 +755,12 @@ function renderApp(){
     + (!dbConnected ? '<div class="fmp-db-banner">\u26A0\uFE0F Not connected to the database \u2014 changes won\u2019t be saved right now. Check the server\u2019s MONGODB_URI setup.</div>' : '')
     + '<div class="fmp-header"><div><h1 class="fmp-title">This week\u2019s <em>table</em></h1>'
     + '<div class="fmp-subtitle">Plan dinners, pull the shopping list, go.</div></div>'
+    + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">'
     + '<div class="fmp-weeknav"><button data-action="prev-week">\u2039</button>'
     + '<span>'+formatWeekRange(monday)+'</span>'
-    + '<button data-action="next-week">\u203A</button></div></div>'
+    + '<button data-action="next-week">\u203A</button></div>'
+    + (me && me.email ? '<div class="fmp-user-line">'+escapeHTML(me.name||me.email)+' \u00B7 <a href="/auth/logout">Sign out</a></div>' : '')
+    + '</div></div>'
     + notesRowHTML()
     + bankPanelHTML()
     + '<div class="fmp-grid">'
@@ -911,6 +923,20 @@ function onKeydown(e){
   if(e.target && e.target.id==="linkUrlInput" && e.key==="Enter"){ fetchRecipeFromLink(); }
 }
 
+let me = null;
+async function checkMe(){
+  try{
+    const res = await fetch("/api/me");
+    me = await res.json();
+  }catch(e){
+    me = { authConfigured:false, authenticated:false, authorized:false, email:null, name:null };
+  }
+}
+function renderGate(bodyHtml){
+  document.getElementById("app").innerHTML = '<div class="fmp-wrap" style="max-width:460px;padding-top:80px;">'
+    + '<div class="fmp-gate-card">' + bodyHtml + '</div></div>';
+}
+
 async function init(){
   const root = document.getElementById("app");
   root.addEventListener("click", onClick);
@@ -924,6 +950,32 @@ async function init(){
   });
 
   root.innerHTML = '<div style="padding:60px 20px;text-align:center;color:#8b8474;font-family:Karla,sans-serif;">Loading\u2026</div>';
+  await checkMe();
+
+  if(!me.authConfigured){
+    renderGate(
+      '<div class="fmp-gate-title">Almost there</div>'
+      + '<div class="fmp-gate-text">Login isn\u2019t fully configured on this server yet. Check the server\u2019s environment variables (MONGODB_URI, SESSION_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET) and restart.</div>'
+    );
+    return;
+  }
+  if(!me.authenticated){
+    renderGate(
+      '<div class="fmp-gate-title">This week\u2019s table</div>'
+      + '<div class="fmp-gate-text">Sign in with Google to see the menu and shopping list.</div>'
+      + '<a class="fmp-btn-primary" href="/auth/google" style="text-decoration:none;">Sign in with Google</a>'
+    );
+    return;
+  }
+  if(!me.authorized){
+    renderGate(
+      '<div class="fmp-gate-title">Not authorized</div>'
+      + '<div class="fmp-gate-text">Signed in as <span class="fmp-gate-email">'+escapeHTML(me.email||"")+'</span>, but this account isn\u2019t on the list for this app. Ask the owner to add it.</div>'
+      + '<a class="fmp-btn-ghost" href="/auth/logout" style="text-decoration:none;">Sign out</a>'
+    );
+    return;
+  }
+
   await checkDbHealth();
   await migrateLocalStorageIfNeeded();
   await loadRecipeBank();
