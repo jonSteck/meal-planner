@@ -113,11 +113,20 @@ the planner; closing it stops the server.
 
 ## Who can access it
 
-Only Google accounts listed in `ALLOWED_EMAILS` (in `.env`) get in — anyone
-else who signs in sees a "not authorized" screen with no access to your
-data. To add or remove someone, edit `ALLOWED_EMAILS` and restart the
-server (and add/remove them as a test user in the Google Cloud Console if
-your OAuth consent screen is still in Testing mode).
+Anyone can sign in with Google, but only accounts listed in
+`ALLOWED_EMAILS` (in `.env`) get full access. Everyone else sees a
+**read-only** version — they can view the week's menu, browse the recipe
+bank, and check off shopping list items visually, but every editing
+control (choosing meals, adding/editing/removing recipes, checking off
+items, adding extra items) is hidden, and the server refuses those actions
+even if attempted directly. A small banner reminds them they're in
+read-only mode.
+
+To grant someone full (editing) access, add their email to
+`ALLOWED_EMAILS` and restart the server (and add them as a test user in
+the Google Cloud Console if your OAuth consent screen is still in Testing
+mode — that's separate from `ALLOWED_EMAILS` and controls who can sign in
+at all).
 
 Each signed-in person's name/email shows in the top-right of the app, with
 a Sign out link.
@@ -212,8 +221,8 @@ ephemeral filesystem. Two things to update when you do:
   "Authorized redirect URIs" on your OAuth client (check for a trailing
   slash mismatch or http vs. https), or the OAuth consent screen is in
   Testing mode and your account isn't added as a test user.
-- **Signed in but see "Not authorized"** — your email isn't in
-  `ALLOWED_EMAILS`. Add it and restart the server.
+- **Signed in but everything looks locked / read-only** — your email
+  isn't in `ALLOWED_EMAILS`. Add it and restart the server for full access.
 - **Recipe link import comes back empty or wrong** — extraction quality
   depends on the recipe site; you'll see a preview before it's added, and
   can discard and add the recipe manually instead, or edit it after adding.

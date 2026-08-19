@@ -120,17 +120,22 @@ app.get("/api/me", (req, res) => {
   });
 });
 
-function requireAuthorizedUser(req, res, next) {
+function requireSignedIn(req, res, next) {
   if (!authEnabled) {
     return res.status(503).json({ error: { message: "Login isn't configured on this server yet." } });
   }
   if (!req.isAuthenticated || !req.isAuthenticated()) {
     return res.status(401).json({ error: { message: "Sign in to continue." } });
   }
-  if (!isAuthorized(req.user.email)) {
-    return res.status(403).json({ error: { message: "This Google account isn't authorized for this app." } });
-  }
   next();
+}
+function requireAuthorizedUser(req, res, next) {
+  requireSignedIn(req, res, () => {
+    if (!isAuthorized(req.user.email)) {
+      return res.status(403).json({ error: { message: "This Google account can view the app but isn't authorized to make changes." } });
+    }
+    next();
+  });
 }
 
 app.use(express.static(path.join(__dirname, "public")));
@@ -164,7 +169,7 @@ app.get("/api/health", (req, res) => {
   res.json({ ok: !!collection });
 });
 
-app.get("/api/data/:key", requireAuthorizedUser, async (req, res) => {
+app.get("/api/data/:key", requireSignedIn, async (req, res) => {
   if (!collection) {
     return res.status(503).json({ error: { message: "Not connected to the database. Check the server's MONGODB_URI setup." } });
   }

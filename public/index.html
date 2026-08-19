@@ -94,6 +94,7 @@ html, body { margin:0; padding:0; background:#F6F1E3; color-scheme: light; }
 .fmp-receipt-body { padding:6px 20px 4px; max-height:560px; overflow-y:auto; }
 .fmp-section-label { font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--sage-dark); margin:16px 0 6px; }
 .fmp-item-row { display:flex; align-items:baseline; gap:8px; padding:5px 0; cursor:pointer; }
+.fmp-item-row.readonly { cursor:default; }
 .fmp-checkbox { width:15px; height:15px; border-radius:4px; border:1.5px solid #b8b1a0; flex:none; display:flex; align-items:center; justify-content:center; margin-top:2px; font-size:10px; color:#fff; }
 .fmp-checkbox.on { background:var(--sage); border-color:var(--sage); }
 .fmp-item-name { font-size:13.5px; flex:none; }
@@ -123,6 +124,7 @@ html, body { margin:0; padding:0; background:#F6F1E3; color-scheme: light; }
 #modal-root { font-family:'Karla',sans-serif; color:var(--ink); color-scheme: light; }
 .fmp-savenote { font-size:11.5px; color:#a39c8a; text-align:center; margin-top:18px; }
 .fmp-db-banner { background:#FCEEE9; border:1px solid #E8B7A5; color:#8a3d20; font-size:13px; font-weight:600; padding:10px 16px; border-radius:10px; margin-bottom:16px; }
+.fmp-readonly-banner { background:#EEF1EC; border:1px solid #C7D1C0; color:var(--sage-dark); font-size:13px; font-weight:600; padding:10px 16px; border-radius:10px; margin-bottom:16px; }
 .fmp-user-line { font-size:11.5px; color:#8b8474; }
 .fmp-user-line a { color:var(--sage-dark); text-decoration:none; }
 .fmp-user-line a:hover { text-decoration:underline; }
@@ -608,9 +610,13 @@ function dayCardHTML(day, idx){
 
   let body = "";
   if(!meal && !isCustom){
-    body = daySelectHTML(day)
-      + '<div class="fmp-day-actions" style="justify-content:flex-start;margin-top:8px;">'
-      + '<button class="fmp-btn-ghost" style="padding:6px 12px;font-size:12px;" data-action="surprise-day" data-day="'+day+'">\u21C4 Surprise me</button></div>';
+    if(readOnly){
+      body = '<div class="fmp-ingr-list" style="font-style:italic;">No meal planned</div>';
+    } else {
+      body = daySelectHTML(day)
+        + '<div class="fmp-day-actions" style="justify-content:flex-start;margin-top:8px;">'
+        + '<button class="fmp-btn-ghost" style="padding:6px 12px;font-size:12px;" data-action="surprise-day" data-day="'+day+'">\u21C4 Surprise me</button></div>';
+    }
   } else if(meal){
     body = '<div class="fmp-meal-card">'
       + '<div class="fmp-meal-name">'+escapeHTML(meal.name)+'</div>'
@@ -620,18 +626,27 @@ function dayCardHTML(day, idx){
       + '<div class="fmp-ingr-list">'+escapeHTML(meal.ingredients.map(i=>i.name).join(", "))+'</div>'
       + '<div class="fmp-day-actions">'
       + '<button class="fmp-icon-btn" data-action="view-meal" data-day="'+day+'" title="View recipe">\uD83D\uDC41</button>'
-      + '<button class="fmp-icon-btn" data-action="clear-day" data-day="'+day+'" title="Remove">\u2715</button>'
+      + (readOnly ? '' : '<button class="fmp-icon-btn" data-action="clear-day" data-day="'+day+'" title="Remove">\u2715</button>')
       + '</div></div>';
   } else if(isCustom){
-    body = '<div class="fmp-custom">'
-      + '<label>Meal name</label>'
-      + '<input type="text" placeholder="e.g. Grandma\u2019s lasagna" data-day="'+day+'" data-field="name" value="'+escapeAttr(entry.customName||"")+'" />'
-      + '<label>Ingredients (one per line, qty first \u2014 "2 lb chicken thighs")</label>'
-      + '<textarea data-day="'+day+'" data-field="ingredients" placeholder="2 lb chicken thighs&#10;1 onion&#10;garlic">'+escapeHTML(entry.customIngredients||"")+'</textarea>'
-      + '<div class="fmp-day-actions">'
-      + '<button class="fmp-icon-btn" data-action="view-custom" data-day="'+day+'" title="View">\uD83D\uDC41</button>'
-      + '<button class="fmp-icon-btn" data-action="clear-day" data-day="'+day+'" title="Remove">\u2715</button>'
-      + '</div></div>';
+    if(readOnly){
+      body = '<div class="fmp-meal-card">'
+        + '<div class="fmp-meal-name">'+escapeHTML(entry.customName || "Custom meal")+'</div>'
+        + '<div class="fmp-ingr-list">'+escapeHTML((entry.customIngredients||"").split("\n").map(s=>s.trim()).filter(Boolean).join(", "))+'</div>'
+        + '<div class="fmp-day-actions">'
+        + '<button class="fmp-icon-btn" data-action="view-custom" data-day="'+day+'" title="View">\uD83D\uDC41</button>'
+        + '</div></div>';
+    } else {
+      body = '<div class="fmp-custom">'
+        + '<label>Meal name</label>'
+        + '<input type="text" placeholder="e.g. Grandma\u2019s lasagna" data-day="'+day+'" data-field="name" value="'+escapeAttr(entry.customName||"")+'" />'
+        + '<label>Ingredients (one per line, qty first \u2014 "2 lb chicken thighs")</label>'
+        + '<textarea data-day="'+day+'" data-field="ingredients" placeholder="2 lb chicken thighs&#10;1 onion&#10;garlic">'+escapeHTML(entry.customIngredients||"")+'</textarea>'
+        + '<div class="fmp-day-actions">'
+        + '<button class="fmp-icon-btn" data-action="view-custom" data-day="'+day+'" title="View">\uD83D\uDC41</button>'
+        + '<button class="fmp-icon-btn" data-action="clear-day" data-day="'+day+'" title="Remove">\u2715</button>'
+        + '</div></div>';
+    }
   }
   return '<div class="fmp-day"><div class="fmp-day-head"><span class="fmp-day-name">'+DAY_FULL[day]+'</span>'
     + '<span class="fmp-day-date">'+formatDayDate(monday, idx)+'</span></div>'+body+'</div>';
@@ -639,7 +654,7 @@ function dayCardHTML(day, idx){
 function notesRowHTML(){
   return '<div class="fmp-notes-row">'
     + '<button class="fmp-btn-ghost" data-action="toggle-bank">\uD83D\uDCD6 Recipe bank ('+recipeBank.length+')</button>'
-    + '<button class="fmp-btn-ghost" data-action="fill-week">\u21C4 Fill empty days</button>'
+    + (readOnly ? '' : '<button class="fmp-btn-ghost" data-action="fill-week">\u21C4 Fill empty days</button>')
     + '</div>';
 }
 function editRecipeFormHTML(recipe){
@@ -661,35 +676,37 @@ function bankPanelHTML(){
   let html = '<div class="fmp-recipebank">';
   html += '<div class="fmp-recipebank-head"><span class="fmp-recipebank-title">Recipe bank</span>'
     + '<button class="fmp-icon-btn" data-action="close-bank" title="Close">\u2715</button></div>';
-  html += '<div class="fmp-link-form">'
-    + '<input type="text" id="linkUrlInput" placeholder="Paste a recipe link\u2026" value="'+escapeAttr(linkUrl)+'" />'
-    + '<button class="fmp-btn-primary" data-action="fetch-link"'+(linkLoading?" disabled":"")+'>'
-    + (linkLoading ? '<span class="fmp-spin">\u27F3</span> Reading\u2026' : '\uD83D\uDD17 Fetch')
-    + '</button></div>';
-  if(linkError) html += '<div class="fmp-form-error" style="margin-bottom:10px;">'+escapeHTML(linkError)+'</div>';
-  if(linkPreview){
-    html += '<div class="fmp-link-preview">'
-      + '<div class="fmp-meal-name">'+escapeHTML(linkPreview.name)+'</div>'
-      + '<div class="fmp-meal-meta">' + (linkPreview.time?'<span class="fmp-tag time">'+escapeHTML(linkPreview.time)+'</span>':'')
-      + linkPreview.tags.map(t=>'<span class="fmp-tag">'+(TAG_LABEL[t]||t)+'</span>').join("")
-      + '</div>'
-      + '<div class="fmp-ingr-list">'+escapeHTML(linkPreview.ingredients.map(i=>i.name).join(", "))+'</div>'
-      + '<div class="fmp-link-preview-actions">'
-      + '<button class="fmp-btn-ghost" data-action="discard-link">Discard</button>'
-      + '<button class="fmp-btn-primary" data-action="confirm-link">+ Add to bank</button>'
-      + '</div></div>';
+  if(!readOnly){
+    html += '<div class="fmp-link-form">'
+      + '<input type="text" id="linkUrlInput" placeholder="Paste a recipe link\u2026" value="'+escapeAttr(linkUrl)+'" />'
+      + '<button class="fmp-btn-primary" data-action="fetch-link"'+(linkLoading?" disabled":"")+'>'
+      + (linkLoading ? '<span class="fmp-spin">\u27F3</span> Reading\u2026' : '\uD83D\uDD17 Fetch')
+      + '</button></div>';
+    if(linkError) html += '<div class="fmp-form-error" style="margin-bottom:10px;">'+escapeHTML(linkError)+'</div>';
+    if(linkPreview){
+      html += '<div class="fmp-link-preview">'
+        + '<div class="fmp-meal-name">'+escapeHTML(linkPreview.name)+'</div>'
+        + '<div class="fmp-meal-meta">' + (linkPreview.time?'<span class="fmp-tag time">'+escapeHTML(linkPreview.time)+'</span>':'')
+        + linkPreview.tags.map(t=>'<span class="fmp-tag">'+(TAG_LABEL[t]||t)+'</span>').join("")
+        + '</div>'
+        + '<div class="fmp-ingr-list">'+escapeHTML(linkPreview.ingredients.map(i=>i.name).join(", "))+'</div>'
+        + '<div class="fmp-link-preview-actions">'
+        + '<button class="fmp-btn-ghost" data-action="discard-link">Discard</button>'
+        + '<button class="fmp-btn-primary" data-action="confirm-link">+ Add to bank</button>'
+        + '</div></div>';
+    }
+    html += '<span class="fmp-manual-toggle" data-action="toggle-manual">'+(showManualForm?"Cancel manual entry":"+ Add a recipe manually")+'</span>';
+    if(showManualForm){
+      html += '<div class="fmp-manual-form">'
+        + '<input type="text" id="manualNameInput" placeholder="Recipe name" />'
+        + '<textarea id="manualIngredientsInput" placeholder="Ingredients, one per line \u2014 &quot;2 lb chicken thighs&quot;"></textarea>'
+        + '<textarea id="manualInstructionsInput" placeholder="Steps, one per line"></textarea>'
+        + '<button class="fmp-btn-primary" style="align-self:flex-start;" data-action="add-manual">+ Add recipe</button>'
+        + '</div>';
+    }
+    const editingRecipe = editingRecipeId ? recipeBank.find(r=>r.id===editingRecipeId) : null;
+    if(editingRecipe) html += editRecipeFormHTML(editingRecipe);
   }
-  html += '<span class="fmp-manual-toggle" data-action="toggle-manual">'+(showManualForm?"Cancel manual entry":"+ Add a recipe manually")+'</span>';
-  if(showManualForm){
-    html += '<div class="fmp-manual-form">'
-      + '<input type="text" id="manualNameInput" placeholder="Recipe name" />'
-      + '<textarea id="manualIngredientsInput" placeholder="Ingredients, one per line \u2014 &quot;2 lb chicken thighs&quot;"></textarea>'
-      + '<textarea id="manualInstructionsInput" placeholder="Steps, one per line"></textarea>'
-      + '<button class="fmp-btn-primary" style="align-self:flex-start;" data-action="add-manual">+ Add recipe</button>'
-      + '</div>';
-  }
-  const editingRecipe = editingRecipeId ? recipeBank.find(r=>r.id===editingRecipeId) : null;
-  if(editingRecipe) html += editRecipeFormHTML(editingRecipe);
   html += '<div class="fmp-recipe-list">';
   recipeBank.slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach(r=>{
     const meta = [r.time].concat((r.tags||[]).map(t=>TAG_LABEL[t]||t)).filter(Boolean).join(" \u00B7 ") || "\u2014";
@@ -698,8 +715,8 @@ function bankPanelHTML(){
       + '<span class="fmp-recipe-row-meta">'+escapeHTML(meta)+'</span></div>'
       + '<div class="fmp-recipe-row-actions">'
       + '<button class="fmp-icon-btn" data-action="view-bank-recipe" data-id="'+r.id+'" title="View recipe">\uD83D\uDC41</button>'
-      + '<button class="fmp-icon-btn" data-action="edit-recipe" data-id="'+r.id+'" title="Edit recipe">\u270F\uFE0F</button>'
-      + '<button class="fmp-icon-btn" data-action="remove-recipe" data-id="'+r.id+'" title="Remove">\uD83D\uDDD1</button>'
+      + (readOnly ? '' : '<button class="fmp-icon-btn" data-action="edit-recipe" data-id="'+r.id+'" title="Edit recipe">\u270F\uFE0F</button>')
+      + (readOnly ? '' : '<button class="fmp-icon-btn" data-action="remove-recipe" data-id="'+r.id+'" title="Remove">\uD83D\uDDD1</button>')
       + '</div></div>';
   });
   html += '</div></div>';
@@ -717,7 +734,7 @@ function receiptInnerHTML(){
         const key = it.name.toLowerCase()+"|"+((it.unit||"").toLowerCase());
         const done = checkedSet.has(key);
         const qty = it.unit ? (formatQty(it.qty)+" "+it.unit) : formatQty(it.qty);
-        return '<div class="fmp-item-row'+(done?" done":"")+'" data-action="toggle-check" data-key="'+escapeAttr(key)+'">'
+        return '<div class="fmp-item-row'+(done?" done":"")+(readOnly?" readonly":"")+'"'+(readOnly?"":' data-action="toggle-check" data-key="'+escapeAttr(key)+'"')+'>'
           + '<span class="fmp-checkbox'+(done?" on":"")+'">'+(done?"\u2713":"")+'</span>'
           + '<span class="fmp-item-name">'+escapeHTML(it.name)+'</span>'
           + '<span class="fmp-item-leader"></span>'
@@ -727,21 +744,22 @@ function receiptInnerHTML(){
     }).join("") + '</div>';
   }
   const extraListHTML = (weekData.extraItems||[]).map((t,i)=>{
-    return '<div class="fmp-extra-item"><span>'+escapeHTML(t)+'</span><button data-action="remove-extra" data-idx="'+i+'">\u2715</button></div>';
+    return '<div class="fmp-extra-item"><span>'+escapeHTML(t)+'</span>'+(readOnly?'':'<button data-action="remove-extra" data-idx="'+i+'">\u2715</button>')+'</div>';
   }).join("");
   return '<div class="fmp-receipt-top"></div>'
     + '<div class="fmp-receipt-head"><span class="fmp-receipt-title">\uD83D\uDED2 Shopping list</span>'
     + '<span class="fmp-receipt-count">'+list.totalCount+' item'+(list.totalCount===1?"":"s")+'</span></div>'
     + bodyHTML
-    + '<div class="fmp-extra">'
-    + '<label style="font-size:11px;color:#8b8474;text-transform:uppercase;letter-spacing:.04em;">Add your own item</label>'
-    + '<div class="fmp-extra-form"><input type="text" id="extraInput" placeholder="e.g. 2 gal milk" />'
-    + '<button data-action="add-extra">+</button></div>'
-    + (extraListHTML ? '<div class="fmp-extra-list">'+extraListHTML+'</div>' : '')
-    + '</div>'
+    + (readOnly ? '' :
+      '<div class="fmp-extra">'
+      + '<label style="font-size:11px;color:#8b8474;text-transform:uppercase;letter-spacing:.04em;">Add your own item</label>'
+      + '<div class="fmp-extra-form"><input type="text" id="extraInput" placeholder="e.g. 2 gal milk" />'
+      + '<button data-action="add-extra">+</button></div>'
+      + (extraListHTML ? '<div class="fmp-extra-list">'+extraListHTML+'</div>' : '')
+      + '</div>')
     + '<div class="fmp-receipt-actions">'
     + '<button data-action="copy-list">\u29C9 Copy list</button>'
-    + '<button data-action="clear-checks">\uD83D\uDDD1 Clear checks</button>'
+    + (readOnly ? '' : '<button data-action="clear-checks">\uD83D\uDDD1 Clear checks</button>')
     + '</div>'
     + '<div class="fmp-copied" id="copiedMsg">Copied to clipboard</div>';
 }
@@ -753,13 +771,14 @@ function renderApp(){
   const root = document.getElementById("app");
   root.innerHTML = '<div class="fmp-wrap">'
     + (!dbConnected ? '<div class="fmp-db-banner">\u26A0\uFE0F Not connected to the database \u2014 changes won\u2019t be saved right now. Check the server\u2019s MONGODB_URI setup.</div>' : '')
+    + (readOnly ? '<div class="fmp-readonly-banner">\uD83D\uDD12 Viewing in read-only mode. Ask the owner to add your email to make changes.</div>' : '')
     + '<div class="fmp-header"><div><h1 class="fmp-title">This week\u2019s <em>table</em></h1>'
     + '<div class="fmp-subtitle">Plan dinners, pull the shopping list, go.</div></div>'
     + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">'
     + '<div class="fmp-weeknav"><button data-action="prev-week">\u2039</button>'
     + '<span>'+formatWeekRange(monday)+'</span>'
     + '<button data-action="next-week">\u203A</button></div>'
-    + (me && me.email ? '<div class="fmp-user-line">'+escapeHTML(me.name||me.email)+' \u00B7 <a href="/auth/logout">Sign out</a></div>' : '')
+    + (me && me.email ? '<div class="fmp-user-line">'+escapeHTML(me.name||me.email)+(readOnly ? ' \uD83D\uDD12' : '')+' \u00B7 <a href="/auth/logout">Sign out</a></div>' : '')
     + '</div></div>'
     + notesRowHTML()
     + bankPanelHTML()
@@ -924,6 +943,7 @@ function onKeydown(e){
 }
 
 let me = null;
+let readOnly = false;
 async function checkMe(){
   try{
     const res = await fetch("/api/me");
@@ -967,17 +987,11 @@ async function init(){
     );
     return;
   }
-  if(!me.authorized){
-    renderGate(
-      '<div class="fmp-gate-title">Not authorized</div>'
-      + '<div class="fmp-gate-text">Signed in as <span class="fmp-gate-email">'+escapeHTML(me.email||"")+'</span>, but this account isn\u2019t on the list for this app. Ask the owner to add it.</div>'
-      + '<a class="fmp-btn-ghost" href="/auth/logout" style="text-decoration:none;">Sign out</a>'
-    );
-    return;
-  }
+
+  readOnly = !me.authorized;
 
   await checkDbHealth();
-  await migrateLocalStorageIfNeeded();
+  if(!readOnly) await migrateLocalStorageIfNeeded();
   await loadRecipeBank();
   await loadWeek();
   renderApp();
