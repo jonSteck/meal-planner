@@ -161,7 +161,7 @@ const DAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 const DAY_FULL = { Mon:"Monday", Tue:"Tuesday", Wed:"Wednesday", Thu:"Thursday", Fri:"Friday", Sat:"Saturday", Sun:"Sunday" };
 const SECTIONS = ["Produce","Meat & Seafood","Dairy & Eggs","Pantry","Frozen","Bakery","Other"];
 const TAG_LABEL = { quick:"quick", "kid-friendly":"kid favorite", slow:"slow cooker", veg:"vegetarian", "freezer-friendly":"freezes well", healthy:"light", comfort:"comfort food", fun:"hands-on" };
-const UNIT_WORDS = ["lb","lbs","oz","g","kg","cup","cups","tbsp","tsp","clove","cloves","can","cans","bunch","bunches","head","heads","pint","pints","qt","quart","gallon","dozen","slice","slices","stick","sticks","jar","jars","bag","bags","box","boxes","package","packages","pkg","stalk","stalks","block","blocks"];
+const UNIT_WORDS = ["lb","lbs","oz","g","kg","cup","cups","tbsp","tsp","clove","cloves","can","cans","bunch","bunches","head","heads","pint","pints","qt","quart","gallon","dozen","slice","slices","stick","sticks","jar","jars","bag","bags","box","boxes","package","packages","pkg","stalk","stalks","block","blocks","pinch","pinches"];
 
 const SEED_RECIPES = [
   { id:"m1", name:"Sheet-Pan Lemon Chicken & Broccoli", tags:["quick","kid-friendly"], time:"30 min", sourceUrl:null, ingredients:[
@@ -255,14 +255,22 @@ function formatWeekRange(monday){ const sunday=addDays(monday,6); const optsA={m
 function formatDayDate(monday,idx){ return addDays(monday,idx).toLocaleDateString(undefined,{month:"short",day:"numeric"}); }
 
 const SECTION_KEYWORDS = {
-  "Produce":["onion","garlic","lemon","lime","tomato","pepper","broccoli","spinach","lettuce","carrot","potato","cilantro","basil","avocado","cucumber","apple","banana","mushroom","celery","zucchini","ginger","scallion","kale","asparagus"],
+  "Produce":["onion","garlic","lemon","lime","tomato","pepper","broccoli","spinach","lettuce","carrot","potato","cilantro","basil","avocado","cucumber","apple","banana","mushroom","celery","zucchini","ginger","scallion","kale","asparagus","chickpea","chickpeas"],
   "Meat & Seafood":["chicken","beef","pork","salmon","shrimp","turkey","bacon","sausage","fish","steak"],
   "Dairy & Eggs":["milk","cheese","yogurt","butter","egg","cream","parmesan","mozzarella","ricotta"],
   "Frozen":["frozen","peas"],
   "Bakery":["bread","bun","roll","bagel","tortilla","dough"],
-  "Pantry":["oil","flour","sugar","rice","pasta","bean","broth","stock","sauce","vinegar","spice","salt","cumin","paprika","noodle","can ","lentil","chili powder"],
+  "Pantry":["oil","flour","sugar","rice","pasta","bean","broth","stock","sauce","vinegar","spice","salt","cumin","paprika","noodle","can","lentil","chili powder","peanut butter","honey","vanilla","baking powder","chocolate chips"],
 };
-function guessSection(name){ const n=name.toLowerCase(); for(const [section,words] of Object.entries(SECTION_KEYWORDS)){ if(words.some(w=>n.includes(w))) return section; } return "Other"; }
+// Word-boundary match, not plain substring — otherwise e.g. "peas" (a Frozen
+// keyword) would false-positive inside "chickpeas", or "egg" inside "eggplant".
+function guessSection(name){
+  const n=name.toLowerCase();
+  for(const [section,words] of Object.entries(SECTION_KEYWORDS)){
+    if(words.some(w=>new RegExp("\\b"+w.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\b","i").test(n))) return section;
+  }
+  return "Other";
+}
 
 const UNICODE_FRACTIONS = { "\u00BC":"1/4", "\u00BD":"1/2", "\u00BE":"3/4", "\u2153":"1/3", "\u2154":"2/3", "\u2155":"1/5", "\u2156":"2/5", "\u2157":"3/5", "\u2158":"4/5", "\u2159":"1/6", "\u215A":"5/6", "\u215B":"1/8", "\u215C":"3/8", "\u215D":"5/8", "\u215E":"7/8" };
 function normalizeFractions(str){
@@ -356,6 +364,7 @@ let linkLoading = false;
 let linkError = null;
 let linkPreview = null;
 let showManualForm = false;
+let showIgImport = false;
 let editingRecipeId = null;
 
 let cookingRecipe = null;
@@ -539,6 +548,75 @@ function confirmAddLinkRecipe(){
   linkPreview = null; linkUrl = ""; linkError = null;
   renderApp();
 }
+async function fetchRecipeFromInstagramLink(){
+  const input = document.getElementById("igUrlInput");
+  const url = input ? input.value.trim() : "";
+  if(!url) return;
+  linkLoading = true; linkError = null; linkPreview = null;
+  renderApp();
+  try{
+    const resp = await fetch("/api/import-instagram", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ url })
+    });
+    const data = await resp.json();
+    if(resp.ok && data.recipe){
+      applyInstagramRecipe(data.recipe);
+      return;
+    }
+    linkError = (data && data.error && data.error.message) ? data.error.message : "Couldn't read that post automatically. Paste the caption text below instead.";
+  }catch(e){
+    linkError = "Couldn't reach Instagram. Paste the caption text below instead.";
+  }finally{
+    linkLoading = false;
+    renderApp();
+  }
+}
+async function parseInstagramCaption(){
+  const ta = document.getElementById("igCaptionInput");
+  const captionText = ta ? ta.value.trim() : "";
+  if(!captionText) return;
+  linkLoading = true; linkError = null; linkPreview = null;
+  renderApp();
+  try{
+    const resp = await fetch("/api/import-instagram", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ captionText })
+    });
+    const data = await resp.json();
+    if(resp.ok && data.recipe){
+      applyInstagramRecipe(data.recipe);
+      return;
+    }
+    linkError = (data && data.error && data.error.message) ? data.error.message : "Couldn't find a recipe in that text.";
+  }catch(e){
+    linkError = "Something went wrong parsing that caption.";
+  }finally{
+    linkLoading = false;
+    renderApp();
+  }
+}
+function applyInstagramRecipe(r){
+  const ingredients = (r.ingredientsRaw||[]).map(parseIngredientLine).filter(Boolean);
+  if(!ingredients.length){
+    linkError = "Found the recipe sections, but couldn't read any ingredients from them.";
+    linkLoading = false;
+    renderApp();
+    return;
+  }
+  linkPreview = {
+    name: r.name || "Untitled recipe",
+    time: r.time || "",
+    tags: r.tags || [],
+    ingredients,
+    instructions: r.instructions || [],
+    sourceUrl: r.sourceUrl || null,
+  };
+  linkLoading = false;
+  renderApp();
+}
 function addManualRecipe(){
   const nameEl = document.getElementById("manualNameInput");
   const ingrEl = document.getElementById("manualIngredientsInput");
@@ -695,6 +773,20 @@ function bankPanelHTML(){
         + '<button class="fmp-btn-primary" data-action="confirm-link">+ Add to bank</button>'
         + '</div></div>';
     }
+    html += '<div class="fmp-ig-import">'
+      + '<span class="fmp-manual-toggle" data-action="toggle-ig">'+(showIgImport?"Hide Instagram import":"+ Import from an Instagram post")+'</span>';
+    if(showIgImport){
+      html += '<div class="fmp-manual-form">'
+        + '<label style="font-size:11px;color:#8b8474;">Works for creators with a consistent "Full Recipe" / "Method:" caption format \u2014 not general-purpose.</label>'
+        + '<input type="text" id="igUrlInput" placeholder="Instagram post link (best-effort, often blocked)" />'
+        + '<button class="fmp-btn-ghost" style="align-self:flex-start;" data-action="fetch-ig-link"'+(linkLoading?" disabled":"")+'>Try fetch from link</button>'
+        + '<label style="font-size:11px;color:#8b8474;margin-top:6px;">Or paste the caption text directly (reliable):</label>'
+        + '<textarea id="igCaptionInput" placeholder="Paste the full post caption here"></textarea>'
+        + '<button class="fmp-btn-primary" style="align-self:flex-start;" data-action="parse-ig-caption"'+(linkLoading?" disabled":"")+'>'
+        + (linkLoading ? '<span class="fmp-spin">\u27F3</span> Reading\u2026' : 'Parse caption')
+        + '</button></div>';
+    }
+    html += '</div>';
     html += '<span class="fmp-manual-toggle" data-action="toggle-manual">'+(showManualForm?"Cancel manual entry":"+ Add a recipe manually")+'</span>';
     if(showManualForm){
       html += '<div class="fmp-manual-form">'
@@ -771,14 +863,14 @@ function renderApp(){
   const root = document.getElementById("app");
   root.innerHTML = '<div class="fmp-wrap">'
     + (!dbConnected ? '<div class="fmp-db-banner">\u26A0\uFE0F Not connected to the database \u2014 changes won\u2019t be saved right now. Check the server\u2019s MONGODB_URI setup.</div>' : '')
-    + (readOnly ? '<div class="fmp-readonly-banner">\uD83D\uDD12 Viewing in read-only mode. Ask the owner to add your email to make changes.</div>' : '')
+    + (readOnly ? '<div class="fmp-readonly-banner">\uD83D\uDD12 Viewing '+escapeHTML(me.household||"this household")+'\u2019s plan read-only. Ask the owner to add your email to make changes.</div>' : '')
     + '<div class="fmp-header"><div><h1 class="fmp-title">This week\u2019s <em>table</em></h1>'
     + '<div class="fmp-subtitle">Plan dinners, pull the shopping list, go.</div></div>'
     + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">'
     + '<div class="fmp-weeknav"><button data-action="prev-week">\u2039</button>'
     + '<span>'+formatWeekRange(monday)+'</span>'
     + '<button data-action="next-week">\u203A</button></div>'
-    + (me && me.email ? '<div class="fmp-user-line">'+escapeHTML(me.name||me.email)+(readOnly ? ' \uD83D\uDD12' : '')+' \u00B7 <a href="/auth/logout">Sign out</a></div>' : '')
+    + (me && me.email ? '<div class="fmp-user-line">'+escapeHTML(me.name||me.email)+(me.household ? ' \u00B7 '+escapeHTML(me.household) : '')+(readOnly ? ' \uD83D\uDD12' : '')+' \u00B7 <a href="/auth/logout">Sign out</a></div>' : '')
     + '</div></div>'
     + notesRowHTML()
     + bankPanelHTML()
@@ -894,6 +986,9 @@ function onClick(e){
   else if(action==="discard-link"){ linkPreview = null; renderApp(); }
   else if(action==="confirm-link"){ confirmAddLinkRecipe(); }
   else if(action==="toggle-manual"){ showManualForm = !showManualForm; renderApp(); }
+  else if(action==="toggle-ig"){ showIgImport = !showIgImport; renderApp(); }
+  else if(action==="fetch-ig-link"){ fetchRecipeFromInstagramLink(); }
+  else if(action==="parse-ig-caption"){ parseInstagramCaption(); }
   else if(action==="add-manual"){ addManualRecipe(); }
   else if(action==="view-bank-recipe"){ const r = recipeBank.find(x=>x.id===btn.dataset.id); if(r){ cookingRecipe = r; renderModal(); } }
   else if(action==="edit-recipe"){ startEditingRecipe(btn.dataset.id); }
@@ -949,7 +1044,7 @@ async function checkMe(){
     const res = await fetch("/api/me");
     me = await res.json();
   }catch(e){
-    me = { authConfigured:false, authenticated:false, authorized:false, email:null, name:null };
+    me = { authConfigured:false, authenticated:false, household:null, readOnly:false, email:null, name:null };
   }
 }
 function renderGate(bodyHtml){
@@ -987,8 +1082,16 @@ async function init(){
     );
     return;
   }
+  if(!me.household){
+    renderGate(
+      '<div class="fmp-gate-title">Not part of a household</div>'
+      + '<div class="fmp-gate-text">Signed in as <span class="fmp-gate-email">'+escapeHTML(me.email||"")+'</span>, but this account isn\u2019t part of any household on this app. Ask the owner to add it.</div>'
+      + '<a class="fmp-btn-ghost" href="/auth/logout" style="text-decoration:none;">Sign out</a>'
+    );
+    return;
+  }
 
-  readOnly = !me.authorized;
+  readOnly = !!me.readOnly;
 
   await checkDbHealth();
   if(!readOnly) await migrateLocalStorageIfNeeded();

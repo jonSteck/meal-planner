@@ -71,7 +71,7 @@ following recipes step-by-step.
 
    d. Still on the OAuth consent screen, if it's in Testing mode, scroll to
       **Test users** and add the Google account emails that should be able
-      to sign in — this needs to match `ALLOWED_EMAILS` below.
+      to sign in — this needs to include everyone in `HOUSEHOLDS` below.
 
 6. **Add everything to your `.env` file.** Copy the example:
    ```
@@ -84,11 +84,11 @@ following recipes step-by-step.
    GOOGLE_CLIENT_ID=<from step 5c>
    GOOGLE_CLIENT_SECRET=<from step 5c>
    GOOGLE_CALLBACK_URL=http://localhost:3000/auth/google/callback
-   ALLOWED_EMAILS=you@gmail.com, partner@gmail.com
+   HOUSEHOLDS=steck:you@gmail.com,partner@gmail.com
    ```
-   `ALLOWED_EMAILS` is the full list of who gets access — anyone who signs
-   in with a Google account not on this list will see a clear "not
-   authorized" message instead of the app.
+   `HOUSEHOLDS` is who gets access and how they're grouped — see "Who can
+   access it, and households" below for the full format and what happens
+   for people not listed.
 
 7. **Start the server:**
    ```
@@ -111,25 +111,52 @@ Just repeat step 7 and 8 — open Terminal, `cd` into the folder, run
 `npm start`, then open the URL. Keep the Terminal window open while you use
 the planner; closing it stops the server.
 
-## Who can access it
+## Who can access it, and households
 
-Anyone can sign in with Google, but only accounts listed in
-`ALLOWED_EMAILS` (in `.env`) get full access. Everyone else sees a
-**read-only** version — they can view the week's menu, browse the recipe
-bank, and check off shopping list items visually, but every editing
-control (choosing meals, adding/editing/removing recipes, checking off
-items, adding extra items) is hidden, and the server refuses those actions
-even if attempted directly. A small banner reminds them they're in
-read-only mode.
+Access is grouped into **households** — each household is a set of Google
+emails that share one weekly menu and recipe bank. Different households
+never see each other's data, even though they're using the same app.
+Configure this with `HOUSEHOLDS` in `.env`:
 
-To grant someone full (editing) access, add their email to
-`ALLOWED_EMAILS` and restart the server (and add them as a test user in
-the Google Cloud Console if your OAuth consent screen is still in Testing
-mode — that's separate from `ALLOWED_EMAILS` and controls who can sign in
-at all).
+```
+HOUSEHOLDS=steck:jon@gmail.com,wife@gmail.com;friends:alice@gmail.com,bob@gmail.com
+```
 
-Each signed-in person's name/email shows in the top-right of the app, with
-a Sign out link.
+Households are separated by `;`, and within a household the id comes
+before the `:`, followed by a comma-separated list of emails. For most
+people this is just one household — e.g. `steck:jon@gmail.com,wife@gmail.com`
+— and everyone in it sees and edits the exact same thing.
+
+**Anyone who signs in with Google but isn't listed in any household**
+still gets in, but **read-only**: they can view the week's menu, browse
+the recipe bank, and see the shopping list, but every editing control is
+hidden and the server refuses edits even if attempted directly. A banner
+reminds them they're viewing read-only, and which household's plan they're
+seeing. Which household that is:
+
+- With **one household configured** (the common case), it's automatic —
+  everyone who isn't a member sees that one household read-only.
+- With **more than one household configured**, set `DEFAULT_HOUSEHOLD` in
+  `.env` to the household id strangers should see read-only, or leave it
+  unset to give non-members no access at all.
+
+To add or remove someone from a household, edit `HOUSEHOLDS` and restart
+the server (and add them as a test user in the Google Cloud Console if
+your OAuth consent screen is still in Testing mode — that's separate from
+`HOUSEHOLDS` and controls who can sign in at all).
+
+Each signed-in person's name, household, and a Sign out link show in the
+top-right of the app.
+
+**Upgrading from before households existed:** if you were already using
+`ALLOWED_EMAILS` (a flat list, no groups), it still works exactly as
+before — everyone in it is treated as one household called `default`. If
+you switch to `HOUSEHOLDS` instead, and it's your only household, your
+existing weekly menus and recipe bank are picked up automatically the
+first time you load the app (no manual steps) — this only works
+automatically while you have exactly one household, so if you're planning
+to add a second one, let the app run with just your original household
+first to be sure that carries over before adding another.
 
 ## Using it from other devices on your network
 
@@ -188,6 +215,30 @@ dynamically via JavaScript, or are paywalled), you'll be prompted to add
 the recipe manually instead — quick, and always works. Every recipe in the
 bank, imported or manual, can also be edited afterward with the pencil icon.
 
+## Importing from Instagram
+
+Under "Import from an Instagram post" in the recipe bank, there's a
+second, more specific importer. It's **not general-purpose** — it looks
+for a caption formatted with a "Full Recipe" heading, `*`-bulleted
+ingredients, then a "Method:" heading with numbered steps (this matches
+some recipe-review creators' consistent posting style). It reads no AI
+model — it's plain pattern matching, so it's fast and needs no API key,
+but it will only work on captions shaped roughly like that.
+
+Two ways to feed it a caption:
+- **Paste the caption text directly** — reliable, since you're providing
+  the text yourself.
+- **Give it the post link and hit "Try fetch from link"** — best-effort
+  only. Instagram frequently blocks non-browser requests or only exposes a
+  short, truncated snippet to them, in which case this will fail and
+  you'll need to paste the caption instead. This isn't something that can
+  be fixed in code — it depends on what Instagram decides to serve a
+  given request at a given time, so don't rely on it working.
+
+Either way, you'll see the same preview-before-adding step as the regular
+link importer, so you can check it read things correctly before it's
+saved to the bank.
+
 ## Deploying to Render (or anywhere else)
 
 Since data lives in MongoDB Atlas and sessions do too, this app has no
@@ -202,7 +253,7 @@ ephemeral filesystem. Two things to update when you do:
   variables in its dashboard instead).
 - Once you're happy with it, you can move the OAuth consent screen from
   Testing to Production in Google Cloud Console if you want to skip the
-  "test users" list — `ALLOWED_EMAILS` will still be the real gate either way.
+  "test users" list — `HOUSEHOLDS` will still be the real gate either way.
 
 ## Troubleshooting
 
@@ -222,7 +273,12 @@ ephemeral filesystem. Two things to update when you do:
   slash mismatch or http vs. https), or the OAuth consent screen is in
   Testing mode and your account isn't added as a test user.
 - **Signed in but everything looks locked / read-only** — your email
-  isn't in `ALLOWED_EMAILS`. Add it and restart the server for full access.
+  isn't listed in any household in `HOUSEHOLDS`. Add it there and restart
+  the server for full access.
+- **Not part of a household screen, even with `HOUSEHOLDS` set** — check
+  for typos in the email (must match your Google account exactly, it's
+  matched case-insensitively but not for extra spaces) and that you're
+  using `;` between households and `:` after each household's id.
 - **Recipe link import comes back empty or wrong** — extraction quality
   depends on the recipe site; you'll see a preview before it's added, and
   can discard and add the recipe manually instead, or edit it after adding.
