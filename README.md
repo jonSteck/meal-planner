@@ -215,30 +215,6 @@ dynamically via JavaScript, or are paywalled), you'll be prompted to add
 the recipe manually instead — quick, and always works. Every recipe in the
 bank, imported or manual, can also be edited afterward with the pencil icon.
 
-## Importing from Instagram
-
-Under "Import from an Instagram post" in the recipe bank, there's a
-second, more specific importer. It's **not general-purpose** — it looks
-for a caption formatted with a "Full Recipe" heading, `*`-bulleted
-ingredients, then a "Method:" heading with numbered steps (this matches
-some recipe-review creators' consistent posting style). It reads no AI
-model — it's plain pattern matching, so it's fast and needs no API key,
-but it will only work on captions shaped roughly like that.
-
-Two ways to feed it a caption:
-- **Paste the caption text directly** — reliable, since you're providing
-  the text yourself.
-- **Give it the post link and hit "Try fetch from link"** — best-effort
-  only. Instagram frequently blocks non-browser requests or only exposes a
-  short, truncated snippet to them, in which case this will fail and
-  you'll need to paste the caption instead. This isn't something that can
-  be fixed in code — it depends on what Instagram decides to serve a
-  given request at a given time, so don't rely on it working.
-
-Either way, you'll see the same preview-before-adding step as the regular
-link importer, so you can check it read things correctly before it's
-saved to the bank.
-
 ## Deploying to Render (or anywhere else)
 
 Since data lives in MongoDB Atlas and sessions do too, this app has no

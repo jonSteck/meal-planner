@@ -364,7 +364,6 @@ let linkLoading = false;
 let linkError = null;
 let linkPreview = null;
 let showManualForm = false;
-let showIgImport = false;
 let editingRecipeId = null;
 
 let cookingRecipe = null;
@@ -548,75 +547,6 @@ function confirmAddLinkRecipe(){
   linkPreview = null; linkUrl = ""; linkError = null;
   renderApp();
 }
-async function fetchRecipeFromInstagramLink(){
-  const input = document.getElementById("igUrlInput");
-  const url = input ? input.value.trim() : "";
-  if(!url) return;
-  linkLoading = true; linkError = null; linkPreview = null;
-  renderApp();
-  try{
-    const resp = await fetch("/api/import-instagram", {
-      method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ url })
-    });
-    const data = await resp.json();
-    if(resp.ok && data.recipe){
-      applyInstagramRecipe(data.recipe);
-      return;
-    }
-    linkError = (data && data.error && data.error.message) ? data.error.message : "Couldn't read that post automatically. Paste the caption text below instead.";
-  }catch(e){
-    linkError = "Couldn't reach Instagram. Paste the caption text below instead.";
-  }finally{
-    linkLoading = false;
-    renderApp();
-  }
-}
-async function parseInstagramCaption(){
-  const ta = document.getElementById("igCaptionInput");
-  const captionText = ta ? ta.value.trim() : "";
-  if(!captionText) return;
-  linkLoading = true; linkError = null; linkPreview = null;
-  renderApp();
-  try{
-    const resp = await fetch("/api/import-instagram", {
-      method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ captionText })
-    });
-    const data = await resp.json();
-    if(resp.ok && data.recipe){
-      applyInstagramRecipe(data.recipe);
-      return;
-    }
-    linkError = (data && data.error && data.error.message) ? data.error.message : "Couldn't find a recipe in that text.";
-  }catch(e){
-    linkError = "Something went wrong parsing that caption.";
-  }finally{
-    linkLoading = false;
-    renderApp();
-  }
-}
-function applyInstagramRecipe(r){
-  const ingredients = (r.ingredientsRaw||[]).map(parseIngredientLine).filter(Boolean);
-  if(!ingredients.length){
-    linkError = "Found the recipe sections, but couldn't read any ingredients from them.";
-    linkLoading = false;
-    renderApp();
-    return;
-  }
-  linkPreview = {
-    name: r.name || "Untitled recipe",
-    time: r.time || "",
-    tags: r.tags || [],
-    ingredients,
-    instructions: r.instructions || [],
-    sourceUrl: r.sourceUrl || null,
-  };
-  linkLoading = false;
-  renderApp();
-}
 function addManualRecipe(){
   const nameEl = document.getElementById("manualNameInput");
   const ingrEl = document.getElementById("manualIngredientsInput");
@@ -773,20 +703,6 @@ function bankPanelHTML(){
         + '<button class="fmp-btn-primary" data-action="confirm-link">+ Add to bank</button>'
         + '</div></div>';
     }
-    html += '<div class="fmp-ig-import">'
-      + '<span class="fmp-manual-toggle" data-action="toggle-ig">'+(showIgImport?"Hide Instagram import":"+ Import from an Instagram post")+'</span>';
-    if(showIgImport){
-      html += '<div class="fmp-manual-form">'
-        + '<label style="font-size:11px;color:#8b8474;">Works for creators with a consistent "Full Recipe" / "Method:" caption format \u2014 not general-purpose.</label>'
-        + '<input type="text" id="igUrlInput" placeholder="Instagram post link (best-effort, often blocked)" />'
-        + '<button class="fmp-btn-ghost" style="align-self:flex-start;" data-action="fetch-ig-link"'+(linkLoading?" disabled":"")+'>Try fetch from link</button>'
-        + '<label style="font-size:11px;color:#8b8474;margin-top:6px;">Or paste the caption text directly (reliable):</label>'
-        + '<textarea id="igCaptionInput" placeholder="Paste the full post caption here"></textarea>'
-        + '<button class="fmp-btn-primary" style="align-self:flex-start;" data-action="parse-ig-caption"'+(linkLoading?" disabled":"")+'>'
-        + (linkLoading ? '<span class="fmp-spin">\u27F3</span> Reading\u2026' : 'Parse caption')
-        + '</button></div>';
-    }
-    html += '</div>';
     html += '<span class="fmp-manual-toggle" data-action="toggle-manual">'+(showManualForm?"Cancel manual entry":"+ Add a recipe manually")+'</span>';
     if(showManualForm){
       html += '<div class="fmp-manual-form">'
@@ -857,10 +773,26 @@ function receiptInnerHTML(){
 }
 function updateReceipt(){
   const el = document.getElementById("receipt");
-  if(el) el.innerHTML = receiptInnerHTML();
+  if(!el) return;
+  // Preserve scroll position of the inner scrolling list — otherwise every
+  // re-render (checking an item, adding an extra item, etc.) recreates this
+  // element and silently resets it to the top.
+  const prevBody = el.querySelector(".fmp-receipt-body");
+  const scrollTop = prevBody ? prevBody.scrollTop : 0;
+  el.innerHTML = receiptInnerHTML();
+  const newBody = el.querySelector(".fmp-receipt-body");
+  if(newBody) newBody.scrollTop = scrollTop;
 }
 function renderApp(){
   const root = document.getElementById("app");
+  // Same scroll-preservation as updateReceipt, plus the page's own scroll
+  // position — renderApp rebuilds everything, including the receipt, and
+  // also runs periodically in the background (refreshFromServer), so losing
+  // scroll position here is very noticeable on mobile mid-scroll.
+  const prevBody = root.querySelector(".fmp-receipt-body");
+  const receiptScrollTop = prevBody ? prevBody.scrollTop : 0;
+  const pageScrollX = window.scrollX, pageScrollY = window.scrollY;
+
   root.innerHTML = '<div class="fmp-wrap">'
     + (!dbConnected ? '<div class="fmp-db-banner">\u26A0\uFE0F Not connected to the database \u2014 changes won\u2019t be saved right now. Check the server\u2019s MONGODB_URI setup.</div>' : '')
     + (readOnly ? '<div class="fmp-readonly-banner">\uD83D\uDD12 Viewing '+escapeHTML(me.household||"this household")+'\u2019s plan read-only. Ask the owner to add your email to make changes.</div>' : '')
@@ -880,6 +812,10 @@ function renderApp(){
     + '</div>'
     + '<div class="fmp-savenote">Weekly menus and your recipe bank are saved to the shared database \u2014 visible on every device that opens this app.</div>'
     + '</div>';
+
+  const newBody = root.querySelector(".fmp-receipt-body");
+  if(newBody) newBody.scrollTop = receiptScrollTop;
+  window.scrollTo(pageScrollX, pageScrollY);
 }
 function modalHTML(){
   if(!cookingRecipe) return "";
@@ -986,9 +922,6 @@ function onClick(e){
   else if(action==="discard-link"){ linkPreview = null; renderApp(); }
   else if(action==="confirm-link"){ confirmAddLinkRecipe(); }
   else if(action==="toggle-manual"){ showManualForm = !showManualForm; renderApp(); }
-  else if(action==="toggle-ig"){ showIgImport = !showIgImport; renderApp(); }
-  else if(action==="fetch-ig-link"){ fetchRecipeFromInstagramLink(); }
-  else if(action==="parse-ig-caption"){ parseInstagramCaption(); }
   else if(action==="add-manual"){ addManualRecipe(); }
   else if(action==="view-bank-recipe"){ const r = recipeBank.find(x=>x.id===btn.dataset.id); if(r){ cookingRecipe = r; renderModal(); } }
   else if(action==="edit-recipe"){ startEditingRecipe(btn.dataset.id); }
